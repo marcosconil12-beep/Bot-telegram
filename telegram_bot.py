@@ -5,23 +5,22 @@ import threading
 import requests
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 
-# Desactivar advertencias de certificados SSL no verificados de la API
+# Desactivar advertencias de certificados SSL
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Variables de entorno
+# Variables de entorno de Render
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 FOOTBALL_DATA_KEY = os.environ.get("FOOTBALL_DATA_KEY")
 
 API_URL = "https://football-data.org"
 HEADERS = {
-    "X-Auth-Token": FOOTBALL_DATA_KEY
+    "X-Auth-Token": str(FOOTBALL_DATA_KEY).strip() if FOOTBALL_DATA_KEY else ""
 }
 
-# Servidor HTTP en segundo plano para Render
 class SimpleHTTPRequestHandlerCustom(SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -39,7 +38,7 @@ def send_telegram_message(text):
         logging.error("TELEGRAM_CHAT_ID no está configurado.")
         return
     
-    # URL CORREGIDA: Tu token puesto directamente de forma interna sin depender de Render
+    # Tu token directo corregido y limpio
     url = "https://telegram.org"
     payload = {
         "chat_id": str(CHAT_ID).strip(),
@@ -54,33 +53,33 @@ def send_telegram_message(text):
         logging.error(f"Error enviando mensaje a Telegram: {e}")
 
 def get_live_fixtures():
+    if not FOOTBALL_DATA_KEY:
+        logging.error("No hay clave FOOTBALL_DATA_KEY configurada.")
+        return []
+        
     url = f"{API_URL}?status=LIVE"
     try:
         response = requests.get(url, headers=HEADERS, verify=False)
         if response.status_code == 200:
-            data = response.json()
-            return data.get("matches", [])
+            return response.json().get("matches", [])
+        elif response.status_code == 429:
+            logging.error("API Bloqueada temporalmente: Demasiadas peticiones (Límite 429). Esperando...")
+            return []
         else:
-            logging.error(f"Error API Football-Data: {response.status_code}")
+            logging.error(f"Error API Football-Data. Código de estado: {response.status_code}")
             return []
     except Exception as e:
-        logging.error(f"Error consultando Football-Data: {e}")
+        logging.error(f"Error conectando a la API: {e}")
         return []
 
 def check_live_alerts():
     matches = get_live_fixtures()
-    if not matches:
-        logging.info("No hay partidos en vivo en este momento.")
-        return
-
     for match in matches:
         home_team = match.get("homeTeam", {}).get("name", "Local")
         away_team = match.get("awayTeam", {}).get("name", "Visitante")
-        
         score = match.get("score", {}).get("fullTime", {})
         home_goals = score.get("home", 0)
         away_goals = score.get("away", 0)
-        
         competition = match.get("competition", {}).get("name", "Liga")
         
         mensaje = (
@@ -92,14 +91,18 @@ def check_live_alerts():
         send_telegram_message(mensaje)
 
 def main_loop():
+    # CORREGIDO: El mensaje se envía ANTES de consultar el fútbol para asegurar el arranque
+    time.sleep(2)
     send_telegram_message("🤖 Bot actualizado y activo monitoreando partidos sin límite.")
+    
     while True:
         try:
             check_live_alerts()
         except Exception as e:
             logging.error(f"Error en el ciclo de monitoreo: {e}")
         
-        time.sleep(60)
+        # Subimos el tiempo a 90 segundos para evitar que la cuenta gratis se bloquee
+        time.sleep(90)
 
 if __name__ == "__main__":
     http_thread = threading.Thread(target=run_http_server, daemon=True)
