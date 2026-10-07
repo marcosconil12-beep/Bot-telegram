@@ -38,20 +38,26 @@ def send_telegram_message(text):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
         logging.error("TELEGRAM_BOT_TOKEN o CHAT_ID no configurados.")
         return
+    
+    # Limpiamos posibles espacios o comillas accidentales en el Chat ID
+    clean_chat_id = str(CHAT_ID).strip().replace('"', '').replace("'", "")
+    
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": str(CHAT_ID).strip(),
+        "chat_id": clean_chat_id,
         "text": text
-        # Sin parse_mode para evitar el Error 400 por caracteres especiales
     }
     try:
         res = requests.post(url, json=payload)
-        res.raise_for_status()
-        logging.info("Mensaje enviado con éxito a Telegram.")
+        res_data = res.json()
+        if not res_data.get("ok"):
+            logging.error(f"TELEGRAM RECHAZÓ EL MENSAJE: {res_data}")
+        else:
+            logging.info("Mensaje enviado con éxito a Telegram.")
     except Exception as e:
-        logging.error(f"Error enviando mensaje a Telegram: {e}")
+        logging.error(f"Error en la petición a Telegram: {e}")
 
-# 1. ALERTAS EN DIRECTO (SIN LÍMITES)
+# 1. ALERTAS EN DIRECTO
 def check_live_alerts():
     url = f"{API_URL}?status=IN_PLAY"
     try:
@@ -93,7 +99,7 @@ def check_live_alerts():
             send_telegram_message(msg)
             sent_alerts.add(match_id)
 
-# 2. PRONÓSTICOS PRE-MATCH CON ARGUMENTOS (1 VEZ AL DÍA)
+# 2. PRONÓSTICOS PRE-MATCH CON ARGUMENTOS
 def check_upcoming_value_bets():
     global last_prematch_date
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -153,7 +159,7 @@ def main():
         except Exception as e:
             logging.error(f"Error en bucle principal: {e}")
 
-        # Revisa cada 3 minutos (no agota límites jamás)
+        # Revisa cada 3 minutos
         time.sleep(180)
 
 if __name__ == "__main__":
