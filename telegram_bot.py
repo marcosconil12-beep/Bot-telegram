@@ -3,6 +3,7 @@ import time
 import logging
 import threading
 import requests
+from http.server import SimpleHTTPRequestHandler, HTTPServer
 
 # Desactivar advertencias de certificados SSL
 import urllib3
@@ -11,16 +12,28 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Canal de Telegram extraído de tu Render
+# Variables de entorno
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-
-# METEMOS TU SEGUNDA CLAVE DIRECTAMENTE PARA SALTAR EL BLOQUEO
+# CLAVE DE FÚTBOL FIJA
 FOOTBALL_DATA_KEY = "6d66424ab2d344bb468b05ec1b115991"
 
 API_URL = "https://football-data.org"
 HEADERS = {
     "X-Auth-Token": FOOTBALL_DATA_KEY
 }
+
+# SERVIDOR REQUERIDO POR RENDER PARA EVITAR EL "PORT TIMEOUT"
+class SimpleHTTPRequestHandlerCustom(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot activo y escuchando puerto")
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandlerCustom)
+    logging.info(f"Servidor HTTP levantado con exito en el puerto {port}")
+    server.serve_forever()
 
 def send_telegram_message(text):
     if not CHAT_ID:
@@ -33,7 +46,7 @@ def send_telegram_message(text):
     }
     try:
         res = requests.post(url_telegram, json=payload)
-        logging.info(f"Respuesta envío Telegram: {res.status_code}")
+        logging.info(f"Respuesta envio Telegram: {res.status_code}")
     except Exception as e:
         logging.error(f"Error Telegram: {e}")
 
@@ -43,19 +56,12 @@ def get_live_fixtures():
         response = requests.get(url_futbol, headers=HEADERS, verify=False)
         if response.status_code == 200:
             return response.json().get("matches", [])
-        else:
-            logging.error(f"La API de fútbol rechazó la contraseña. Código: {response.status_code}")
-            return []
-    except Exception as e:
-        logging.error(f"Error de red con la API: {e}")
+        return []
+    except Exception:
         return []
 
 def check_live_alerts():
     matches = get_live_fixtures()
-    if not matches:
-        logging.info("No se encontraron partidos en vivo con esta clave.")
-        return
-
     for match in matches:
         home_team = match.get("homeTeam", {}).get("name", "Local")
         away_team = match.get("awayTeam", {}).get("name", "Visitante")
@@ -73,7 +79,7 @@ def check_live_alerts():
         send_telegram_message(mensaje_partido)
 
 def main_loop():
-    time.sleep(2)
+    time.sleep(3)
     send_telegram_message("🤖 Bot actualizado y activo monitoreando partidos sin límite.")
     
     while True:
@@ -84,5 +90,9 @@ def main_loop():
         time.sleep(90)
 
 if __name__ == "__main__":
-    # Arrancamos el bucle directamente sin servidor HTTP para evitar colapsos
+    # Arreglo para Render: Arranca el servidor web en un hilo secundario
+    http_thread = threading.Thread(target=run_http_server, daemon=True)
+    http_thread.start()
+    
+    # Inicia el rastreador en el hilo principal
     main_loop()
