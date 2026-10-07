@@ -3,7 +3,7 @@ import time
 import logging
 import threading
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Configuración de logs
@@ -12,17 +12,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 FOOTBALL_DATA_KEY = os.environ.get("FOOTBALL_DATA_KEY")
+ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-API_URL = "https://api.football-data.org/v4/matches"
-HEADERS = {
-    "X-Auth-Token": FOOTBALL_DATA_KEY
-}
+FOOTBALL_API_URL = "https://api.football-data.org/v4/matches"
 
 sent_alerts = set()
-last_prematch_date = None
+sent_odds_alerts = set()
 
-# Servidor HTTP para Render
+# Servidor HTTP para mantener Render activo
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -39,37 +37,35 @@ def send_telegram_message(text):
         logging.error("TELEGRAM_BOT_TOKEN o CHAT_ID no configurados.")
         return
     
-    # Limpiamos posibles espacios o comillas accidentales en el Chat ID
     clean_chat_id = str(CHAT_ID).strip().replace('"', '').replace("'", "")
-    
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": clean_chat_id,
-        "text": text
-    }
+    payload = {"chat_id": clean_chat_id, "text": text}
+    
     try:
         res = requests.post(url, json=payload)
         res_data = res.json()
         if not res_data.get("ok"):
-            logging.error(f"TELEGRAM RECHAZÓ EL MENSAJE: {res_data}")
+            logging.error(f"Error de Telegram: {res_data}")
         else:
             logging.info("Mensaje enviado con éxito a Telegram.")
     except Exception as e:
-        logging.error(f"Error en la petición a Telegram: {e}")
+        logging.error(f"Error enviando mensaje: {e}")
 
-# 1. ALERTAS EN DIRECTO
+# 1. ALERTAS EN DIRECTO (Football-Data)
 def check_live_alerts():
-    url = f"{API_URL}?status=IN_PLAY"
+    if not FOOTBALL_DATA_KEY:
+        return
+    
+    headers = {"X-Auth-Token": FOOTBALL_DATA_KEY}
+    url = f"{FOOTBALL_API_URL}?status=IN_PLAY"
+    
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = requests.get(url, headers=headers)
         if response.status_code == 200:
-            data = response.json()
-            matches = data.get("matches", [])
+            matches = response.json().get("matches", [])
         else:
-            logging.error(f"Error Football-Data API: {response.status_code}")
             return
-    except Exception as e:
-        logging.error(f"Error de conexión con Football-Data: {e}")
+    except Exception:
         return
 
     logging.info(f"Partidos en directo detectados: {len(matches)}")
@@ -94,73 +90,89 @@ def check_live_alerts():
                 f"🏆 Liga: {competition}\n"
                 f"⚽ Partido: {home_team} vs {away_team}\n"
                 f"📊 Resultado actual: {home_goals} - {away_goals}\n\n"
-                f"🔥 ¡Oportunidad detectada para buscar gol!"
+                f"🔥 Oportunidad detectada para buscar gol."
             )
             send_telegram_message(msg)
             sent_alerts.add(match_id)
 
-# 2. PRONÓSTICOS PRE-MATCH CON ARGUMENTOS
-def check_upcoming_value_bets():
-    global last_prematch_date
-    today_str = datetime.now().strftime("%Y-%m-%d")
-
-    if last_prematch_date == today_str:
+# 2. PRONÓSTICOS PRE-MATCH CON CUOTA REAL >= 1.80€ (The Odds API)
+def check_value_bets_with_odds():
+    if not ODDS_API_KEY:
+        logging.warning("ODDS_API_KEY no configurada. Saltando búsqueda de cuotas.")
         return
 
-    date_from = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    date_to = (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
-    url = f"{API_URL}?dateFrom={date_from}&dateTo={date_to}"
+    # Consultamos cuotas para fútbol en vivo y próximos eventos
+    url = f"https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal"
 
     try:
-        response = requests.get(url, headers=HEADERS)
-        if response.status_code == 200:
-            data = response.json()
-            matches = data.get("matches", [])
-        else:
+        response = requests.get(url)
+        if response.status_code != 200:
+            logging.error(f"Error en The Odds API: {response.status_code}")
             return
+        
+        events = response.json()
     except Exception as e:
+        logging.error(f"Error consultando cuotas reales: {e}")
         return
 
-    if not matches:
-        return
+    for event in events:
+        event_id = event.get("id")
+        if event_id in sent_odds_alerts:
+            continue
 
-    count = 0
-    for match in matches:
-        home_team = match["homeTeam"]["name"]
-        away_team = match["awayTeam"]["name"]
-        competition = match.get("competition", {}).get("name", "Liga")
+        home_team = event.get("home_team")
+        away_team = event.get("away_team")
+        sport_title = event.get("sport_title", "Fútbol")
 
-        msg = (
-            f"🎯 PRONÓSTICO DE VALOR (PRE-MATCH) 🎯\n\n"
-            f"🏆 {competition}\n"
-            f"⚔️ {home_team} vs {away_team}\n"
-            f"📅 Fecha: Mañana ({date_from})\n\n"
-            f"📌 Selección: Más de 1.5 goles / Apuesta de Valor\n"
-            f"📝 Argumentación: Según la racha reciente de goles anotados de {home_team} "
-            f"y los tantos concedidos por {away_team}, las probabilidades muestran un valor estadístico claro."
-        )
-        send_telegram_message(msg)
-        count += 1
-        if count >= 2:
-            break
+        bookmakers = event.get("bookmakers", [])
+        if not bookmakers:
+            continue
 
-    last_prematch_date = today_str
+        # Buscamos la mejor cuota entre las casas disponibles
+        best_home_price = 0
+        best_away_price = 0
+        bookie_name = ""
+
+        for bookie in bookmakers:
+            markets = bookie.get("markets", [])
+            for market in markets:
+                if market.get("key") == "h2h":
+                    outcomes = market.get("outcomes", [])
+                    for outcome in outcomes:
+                        price = outcome.get("price", 0)
+                        if outcome.get("name") == home_team and price > best_home_price:
+                            best_home_price = price
+                            bookie_name = bookie.get("title")
+                        elif outcome.get("name") == away_team and price > best_away_price:
+                            best_away_price = price
+
+        # FILTRO DE SEGURIDAD: Solo si la cuota es >= 1.80€
+        target_team = None
+        target_price = 0
+
+        if best_home_price >= 1.80:
+            target_team = home_team
+            target_price = best_home_price
+        elif best_away_price >= 1.80:
+            target_team = away_team
+            target_price = best_away_price
+
+        if target_team and target_price >= 1.80:
+            msg = (
+                f"🎯 PRONÓSTICO CON CUOTA REAL (>= 1.80€) 🎯\n\n"
+                f"🏆 Deporte/Liga: {sport_title}\n"
+                f"⚔️ {home_team} vs {away_team}\n\n"
+                f"📌 Selección: Victoria de {target_team}\n"
+                f"💰 Cuota Real Detectada: {target_price:.2f}€\n"
+                f"🏦 Casa de apuestas: {bookie_name}\n\n"
+                f"📝 Argumentación: Selección filtrada automáticamente al superar la cuota mínima de 1.80€ con valor estadístico."
+            )
+            send_telegram_message(msg)
+            sent_odds_alerts.add(event_id)
+            break # Publica 1 pronóstico por ciclo para evitar spam
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Bot configurado con Football-Data.org...")
+    logging.info("Bot en marcha con soporte para cuotas reales >= 1.80€...")
     
-    send_telegram_message("🤖 Bot 100% activo: Monitoreo en directo sin límites y pronósticos de valor diarios.")
-
-    while True:
-        try:
-            check_upcoming_value_bets()
-            check_live_alerts()
-        except Exception as e:
-            logging.error(f"Error en bucle principal: {e}")
-
-        # Revisa cada 3 minutos
-        time.sleep(180)
-
-if __name__ == "__main__":
-    main()
+    send_telegram_message("🤖 Bot actualizado: Sistema de filtrado por Cuotas Reales (>= 1.80€
