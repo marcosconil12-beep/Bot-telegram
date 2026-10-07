@@ -19,43 +19,52 @@ FOOTBALL_API_URL = "https://api.football-data.org/v4/matches"
 sent_alerts = set()
 sent_odds_alerts = set()
 
-# Servidor HTTP para mantener Render activo y responder a pings
+# Diccionario para rastrear partidos pendientes de resultado
+# Estructura: { event_id: { "home_team": ..., "away_team": ..., "target_team": ..., "price": ..., "message_id": ... } }
+pending_bets = {}
+
+# Servidor HTTP para mantener Render activo
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot activo y funcionando 24/7")
+        self.wfile.write(b"Bot activo con seguimiento de aciertos 24/7")
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
-def send_telegram_message(text):
+def send_telegram_message(text, reply_to_message_id=None):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
         logging.error("TELEGRAM_BOT_TOKEN o CHAT_ID no están configurados.")
-        return
+        return None
     
     clean_chat_id = str(CHAT_ID).strip().replace('"', '').replace("'", "")
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    
     payload = {
         "chat_id": clean_chat_id,
         "text": text,
         "parse_mode": "Markdown"
     }
     
+    if reply_to_message_id:
+        payload["reply_to_message_id"] = reply_to_message_id
+    
     try:
         res = requests.post(url, json=payload, timeout=10)
         res_data = res.json()
-        if not res_data.get("ok"):
-            logging.error(f"Error de Telegram: {res_data}")
-        else:
+        if res_data.get("ok"):
             logging.info("Mensaje enviado con éxito a Telegram.")
+            return res_data.get("result", {}).get("message_id")
+        else:
+            logging.error(f"Error de Telegram: {res_data}")
     except Exception as e:
         logging.error(f"Error enviando mensaje a Telegram: {e}")
+    return None
 
 def generar_argumentacion(equipo, rival, cuota, casa):
-    """Genera una argumentación técnica y detallada basada en la cuota y probabilidad implícita."""
     prob_implicita = round((1 / cuota) * 100, 1)
     
     if cuota >= 2.30:
@@ -79,13 +88,12 @@ def generar_argumentacion(equipo, rival, cuota, casa):
             f"La cuota de {cuota:.2f}€ supera el umbral de seguridad mínimo (1.80€) con margen de beneficio."
         )
 
-    argumento = (
+    return (
         f"📊 *Análisis Técnico:*\n"
         f"• *Perfil:* {perfil}\n"
         f"• *Probabilidad Implicita:* {prob_implicita}%\n\n"
         f"💡 *Justificación del Pick:*\n{razon}"
     )
-    return argumento
 
 # 1. ALERTAS EN DIRECTO (Football-Data)
 def check_live_alerts():
@@ -104,8 +112,6 @@ def check_live_alerts():
     except Exception as e:
         logging.error(f"Error al consultar Football-Data: {e}")
         return
-
-    logging.info(f"Partidos en directo detectados: {len(matches)}")
 
     for match in matches:
         match_id = match["id"]
@@ -133,21 +139,17 @@ def check_live_alerts():
             send_telegram_message(msg)
             sent_alerts.add(match_id)
 
-# 2. PRONÓSTICOS PRE-MATCH CON CUOTAS REALES >= 1.80€ (The Odds API)
+# 2. PRONÓSTICOS PRE-MATCH CON CUOTAS REALES >= 1.80€
 def check_value_bets_with_odds():
     if not ODDS_API_KEY:
-        logging.warning("ODDS_API_KEY no está configurada.")
         return
 
-    # Consulta global (Europa, Estados Unidos, Australia) para cubrir partidos las 24 horas
     url = f"https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey={ODDS_API_KEY}&regions=eu,us,au&markets=h2h&oddsFormat=decimal"
 
     try:
         response = requests.get(url, timeout=12)
         if response.status_code != 200:
-            logging.error(f"Error en The Odds API: {response.status_code}")
             return
-        
         events = response.json()
     except Exception as e:
         logging.error(f"Error consultando cuotas reales: {e}")
@@ -183,7 +185,6 @@ def check_value_bets_with_odds():
                         elif outcome.get("name") == away_team and price > best_away_price:
                             best_away_price = price
 
-        # Filtro estricto: Cuota mínima >= 1.80€
         target_team = None
         target_rival = None
         target_price = 0
@@ -211,25 +212,107 @@ def check_value_bets_with_odds():
                 f"⚠️ *Gestión de Stake:* Recomendado Stake 1 (1%-2% del bankroll)."
             )
             
-            send_telegram_message(msg)
+            msg_id = send_telegram_message(msg)
             sent_odds_alerts.add(event_id)
-            break # Publica 1 pick por ciclo para mantener calidad y ritmo adecuado
+
+            # Guardar en la lista de apuestas pendientes para verificar el resultado
+            if msg_id:
+                pending_bets[event_id] = {
+                    "home_team": home_team,
+                    "away_team": away_team,
+                    "target_team": target_team,
+                    "price": target_price,
+                    "message_id": msg_id
+                }
+            break
+
+# 3. VERIFICAR RESULTADOS Y PUBLICAR ACIERTOS / FALLOS
+def check_completed_results():
+    if not ODDS_API_KEY or not pending_bets:
+        return
+
+    url = f"https://api.the-odds-api.com/v4/sports/soccer/scores/?apiKey={ODDS_API_KEY}&daysFrom=1"
+
+    try:
+        response = requests.get(url, timeout=12)
+        if response.status_code != 200:
+            return
+        scores_data = response.json()
+    except Exception as e:
+        logging.error(f"Error al obtener marcadores: {e}")
+        return
+
+    completed_ids = []
+
+    for event in scores_data:
+        event_id = event.get("id")
+        if event_id in pending_bets and event.get("completed"):
+            bet_info = pending_bets[event_id]
+            scores = event.get("scores")
+
+            if not scores or len(scores) < 2:
+                continue
+
+            home_score = 0
+            away_score = 0
+            for score in scores:
+                if score.get("name") == bet_info["home_team"]:
+                    home_score = int(score.get("score", 0))
+                elif score.get("name") == bet_info["away_team"]:
+                    away_score = int(score.get("score", 0))
+
+            # Determinar ganador
+            if home_score > away_score:
+                winner = bet_info["home_team"]
+            elif away_score > home_score:
+                winner = bet_info["away_team"]
+            else:
+                winner = "Empate"
+
+            target_team = bet_info["target_team"]
+            price = bet_info["price"]
+            msg_id = bet_info["message_id"]
+
+            if winner == target_team:
+                ganancia = round((price - 1) * 100, 1)
+                result_msg = (
+                    f"✅ *PRONÓSTICO ACERTADO (GREEN)* 🟢\n\n"
+                    f"⚔️ *Partido:* {bet_info['home_team']} {home_score} - {away_score} {bet_info['away_team']}\n"
+                    f"🎯 *Selección Ganadora:* Victoria de *{target_team}*\n"
+                    f"💰 *Cuota Cobrada:* *{price:.2f}€*\n"
+                    f"📈 *Rentabilidad:* +{ganancia}% de beneficio"
+                )
+            else:
+                result_msg = (
+                    f"❌ *PRONÓSTICO NO ACERTADO (RED)* 🔴\n\n"
+                    f"⚔️ *Resultado Final:* {bet_info['home_team']} {home_score} - {away_score} {bet_info['away_team']}\n"
+                    f"📌 *Apuesta realizada:* Victoria de *{target_team}*\n"
+                    f"📊 *Ganador real:* {winner}"
+                )
+
+            # Responder directamente al mensaje original del pick
+            send_telegram_message(result_msg, reply_to_message_id=msg_id)
+            completed_ids.append(event_id)
+
+    # Eliminar de pendientes los ya procesados
+    for eid in completed_ids:
+        del pending_bets[eid]
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Bot iniciado con motor de análisis avanzado y cuotas reales >= 1.80€...")
+    logging.info("Bot en marcha con módulo de seguimiento de resultados...")
     
-    init_msg = "🤖 *Bot TOPTIPS Actualizado*\n\n✅ Motor de cuotas reales (>= 1.80€) activo.\n✅ Cobertura internacional 24/7.\n✅ Argumentaciones detalladas por partido habilitadas."
+    init_msg = "🤖 *Bot TOPTIPS Actualizado*\n\n✅ Sistema de verificación de aciertos (GREEN/RED) activado."
     send_telegram_message(init_msg)
 
     while True:
         try:
             check_live_alerts()
             check_value_bets_with_odds()
+            check_completed_results()
         except Exception as e:
             logging.error(f"Error en el bucle principal: {e}")
 
-        # Revisa cada 5 minutos
         time.sleep(300)
 
 if __name__ == "__main__":
