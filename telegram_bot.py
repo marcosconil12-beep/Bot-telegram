@@ -8,10 +8,10 @@ import requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Configuración de logs
+# Configuración de logs limpia
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# CLAVE DE FÚTBOL FIJA (La tuya que funciona)
+# CLAVE DE FÚTBOL FIJA
 FOOTBALL_DATA_KEY = "6d66424ab2d344bb468b05ec1b115991"
 
 API_URL = "https://football-data.org"
@@ -20,7 +20,7 @@ HEADERS = {
 }
 
 def send_telegram_message(text):
-    # DIRECCIÓN FIJA A TU CANAL REAL: TOPTIPS
+    # DIRECCIÓN FIJA A TU CANAL REAL TOPTIPS
     url_telegram = "https://telegram.org"
     payload = {
         "chat_id": "@FreeTopTip",
@@ -30,7 +30,7 @@ def send_telegram_message(text):
     }
     try:
         res = requests.post(url_telegram, json=payload)
-        logging.info(f"Respuesta envio Telegram: {res.status_code} - {res.text}")
+        logging.info(f"Respuesta envio Telegram: {res.status_code}")
     except Exception as e:
         logging.error(f"Error Telegram: {e}")
 
@@ -40,17 +40,14 @@ def get_live_fixtures():
         response = requests.get(url_futbol, headers=HEADERS, verify=False)
         if response.status_code == 200:
             return response.json().get("matches", [])
-        else:
-            logging.error(f"La API de futbol rechazo la contraseña. Codigo: {response.status_code}")
-            return []
-    except Exception as e:
-        logging.error(f"Error de red con la API: {e}")
+        return []
+    except Exception:
         return []
 
 def check_live_alerts():
     matches = get_live_fixtures()
     if not matches:
-        logging.info("Monitoreando... No hay partidos en directo en este momento.")
+        logging.info("Monitoreando... No se encontraron partidos en vivo.")
         return
 
     for match in matches:
@@ -58,7 +55,6 @@ def check_live_alerts():
         away_team = match.get("awayTeam", {}).get("name", "Visitante")
         competition = match.get("competition", {}).get("name", "Liga")
         
-        # Estructura de texto idéntica a tu captura clásica
         mensaje_clasico = (
             f"⚽ <b>{home_team} vs {away_team}</b> (00:00 - {competition})\n"
             f"🎯 <b>Mercados a vigilar:</b> Goles / Córners / Tarjetas\n"
@@ -68,7 +64,7 @@ def check_live_alerts():
         send_telegram_message(mensaje_clasico)
 
 def main_loop():
-    # Mensaje de arranque exacto de tu captura antigua
+    # El bot mandará este mensaje al canal nada más arrancar
     time.sleep(3)
     aviso_arranque = (
         "💬 Compartiré alertas en directo cuando las estadísticas "
