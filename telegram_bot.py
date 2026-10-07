@@ -12,12 +12,12 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# CORREGIDO: Enlazado exacto con tus variables de Render
+# CORREGIDO: Llamada directa a tus nombres exactos de Render
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-FOOTBALL_DATA_KEY = os.environ.get("API_FOOTBALL_KEY")
+FOOTBALL_DATA_KEY = os.environ.get("FOOTBALL_DATA_KEY")  # USA TU CLAVE DIRECTAMENTE
 
-API_URL = "https://football-data.org"
+API_URL = "https://api.football-data.org/v4/matches"
 HEADERS = {
     "X-Auth-Token": FOOTBALL_DATA_KEY
 }
@@ -40,9 +40,11 @@ def send_telegram_message(text):
         logging.error("TELEGRAM_BOT_TOKEN o CHAT_ID no están configurados.")
         return
     
-    url = f"https://telegram.org{TELEGRAM_BOT_TOKEN}/sendMessage"
+    # CORRECCIÓN DE EMERGENCIA: Limpia espacios o caracteres invisibles que causan el fallo del host
+    token_limpio = TELEGRAM_BOT_TOKEN.strip().replace(" ", "")
+    url = f"https://telegram.org{token_limpio}/sendMessage"
     payload = {
-        "chat_id": CHAT_ID,
+        "chat_id": CHAT_ID.strip(),
         "text": text,
         "parse_mode": "HTML"
     }
@@ -56,13 +58,12 @@ def send_telegram_message(text):
 def get_live_fixtures():
     url = f"{API_URL}?status=LIVE"
     try:
-        # Se mantiene verify=False para saltar el fallo de seguridad SSL de la API
         response = requests.get(url, headers=HEADERS, verify=False)
         if response.status_code == 200:
             data = response.json()
             return data.get("matches", [])
         else:
-            logging.error(f"Error API Football-Data: {response.status_code}")
+            logging.error(f"Error API Football-Data: {response.status_code} - Verifica que tu clave de football-data sea correcta.")
             return []
     except Exception as e:
         logging.error(f"Error consultando Football-Data: {e}")
@@ -93,7 +94,6 @@ def check_live_alerts():
         send_telegram_message(mensaje)
 
 def main_loop():
-    # Mensaje inicial de arranque que llegará a tu canal
     send_telegram_message("🤖 Bot actualizado y activo monitoreando partidos sin límite.")
     while True:
         try:
