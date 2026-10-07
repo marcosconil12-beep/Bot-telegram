@@ -12,12 +12,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# CORREGIDO: Llamada directa a tus nombres exactos de Render
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+# Variables de entorno
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-FOOTBALL_DATA_KEY = os.environ.get("FOOTBALL_DATA_KEY")  # USA TU CLAVE DIRECTAMENTE
+FOOTBALL_DATA_KEY = os.environ.get("FOOTBALL_DATA_KEY")
 
-API_URL = "https://api.football-data.org/v4/matches"
+API_URL = "https://football-data.org"
 HEADERS = {
     "X-Auth-Token": FOOTBALL_DATA_KEY
 }
@@ -36,15 +35,14 @@ def run_http_server():
     server.serve_forever()
 
 def send_telegram_message(text):
-    if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
-        logging.error("TELEGRAM_BOT_TOKEN o CHAT_ID no están configurados.")
+    if not CHAT_ID:
+        logging.error("TELEGRAM_CHAT_ID no está configurado.")
         return
     
-    # CORRECCIÓN DE EMERGENCIA: Limpia espacios o caracteres invisibles que causan el fallo del host
-    token_limpio = TELEGRAM_BOT_TOKEN.strip().replace(" ", "")
-    url = f"https://telegram.org{token_limpio}/sendMessage"
+    # URL CORREGIDA: Tu token puesto directamente de forma interna sin depender de Render
+    url = "https://telegram.org"
     payload = {
-        "chat_id": CHAT_ID.strip(),
+        "chat_id": str(CHAT_ID).strip(),
         "text": text,
         "parse_mode": "HTML"
     }
@@ -63,7 +61,7 @@ def get_live_fixtures():
             data = response.json()
             return data.get("matches", [])
         else:
-            logging.error(f"Error API Football-Data: {response.status_code} - Verifica que tu clave de football-data sea correcta.")
+            logging.error(f"Error API Football-Data: {response.status_code}")
             return []
     except Exception as e:
         logging.error(f"Error consultando Football-Data: {e}")
