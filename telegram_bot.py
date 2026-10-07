@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 FOOTBALL_DATA_KEY = os.environ.get("FOOTBALL_DATA_KEY")
 
+# URL REAL DE LA API DE FÚTBOL
 API_URL = "https://football-data.org"
 HEADERS = {
     "X-Auth-Token": str(FOOTBALL_DATA_KEY).strip() if FOOTBALL_DATA_KEY else ""
@@ -33,20 +34,44 @@ def run_http_server():
     logging.info(f"Servidor HTTP corriendo en el puerto {port}")
     server.serve_forever()
 
-def get_live_fixtures():
-    if not FOOTBALL_DATA_KEY:
-        return []
-    url = f"{API_URL}?status=LIVE"
+def send_telegram_message(text):
+    if not CHAT_ID:
+        logging.error("TELEGRAM_CHAT_ID no está configurado.")
+        return
+    
+    # URL REAL DE TELEGRAM CON TU TOKEN
+    url_telegram = "https://telegram.org"
+    payload = {
+        "chat_id": str(CHAT_ID).strip(),
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    
     try:
-        response = requests.get(url, headers=HEADERS, verify=False)
+        res = requests.post(url_telegram, json=payload)
+        logging.info(f"Respuesta envío Telegram: {res.status_code}")
+    except Exception as e:
+        logging.error(f"Error enviando mensaje a Telegram: {e}")
+
+def get_live_fixtures():
+    url_futbol = f"{API_URL}?status=LIVE"
+    try:
+        response = requests.get(url_futbol, headers=HEADERS, verify=False)
         if response.status_code == 200:
             return response.json().get("matches", [])
-        return []
-    except Exception:
+        else:
+            logging.error(f"API Fútbol respondió con código: {response.status_code}")
+            return []
+    except Exception as e:
+        logging.error(f"Error conectando a la API de fútbol: {e}")
         return []
 
 def check_live_alerts():
     matches = get_live_fixtures()
+    if not matches:
+        logging.info("No se encontraron partidos en vivo en esta consulta.")
+        return
+
     for match in matches:
         home_team = match.get("homeTeam", {}).get("name", "Local")
         away_team = match.get("awayTeam", {}).get("name", "Visitante")
@@ -61,26 +86,13 @@ def check_live_alerts():
             f"⚔️ {home_team} vs {away_team}\n"
             f"📊 Marcador actual: {home_goals} - {away_goals}\n"
         )
-        # Envío directo simplificado
-        url = "https://telegram.org"
-        requests.post(url, json={"chat_id": str(CHAT_ID).strip(), "text": mensaje_partido, "parse_mode": "HTML"})
+        send_telegram_message(mensaje_partido)
 
 def main_loop():
-    # ENVÍO INMEDIATO AL ARRANCAR (Sin funciones intermedias)
-    url_directa = "https://telegram.org"
-    payload_arranque = {
-        "chat_id": str(CHAT_ID).strip(),
-        "text": "🤖 Bot actualizado y activo monitoreando partidos sin límite.",
-        "parse_mode": "HTML"
-    }
+    # Mandamos el aviso de arranque inmediatamente a tu canal
+    time.sleep(2)
+    send_telegram_message("🤖 Bot actualizado y activo monitoreando partidos sin límite.")
     
-    try:
-        logging.info("Forzando envío de mensaje de arranque a Telegram...")
-        r = requests.post(url_directa, json=payload_arranque)
-        logging.info(f"Respuesta de Telegram: {r.status_code} - {r.text}")
-    except Exception as e:
-        logging.error(f"Error crítico en envío directo: {e}")
-
     while True:
         try:
             check_live_alerts()
