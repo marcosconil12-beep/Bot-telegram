@@ -8,7 +8,7 @@ from http.server import SimpleHTTPRequestHandler, HTTPServer
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Variables de entorno
+# Variables de entorno (Asegúrate de que se llamen exactamente así en Render)
 TELEGRAM_BOT_TOKEN = os.environ.get("TOKEN_BOT_DE_TELEGRAM")
 FOOTBALL_DATA_KEY = os.environ.get("CLAVE_DE_DATOS_DE_FUTBOL")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
@@ -33,7 +33,7 @@ def run_http_server():
 
 def send_telegram_message(text):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
-        logging.error("TELEGRAM_BOT_TOKEN o CHAT_ID no configurados.")
+        logging.error("TELEGRAM_BOT_TOKEN o CHAT_ID no están configurados.")
         return
     
     url = f"https://telegram.org{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -50,7 +50,6 @@ def send_telegram_message(text):
         logging.error(f"Error enviando mensaje a Telegram: {e}")
 
 def get_live_fixtures():
-    # Consulta los partidos en directo de la API configurada
     url = f"{API_URL}?status=LIVE"
     try:
         response = requests.get(url, headers=HEADERS)
@@ -65,7 +64,6 @@ def get_live_fixtures():
         return []
 
 def check_live_alerts():
-    # CORREGIDO: Se unificó el nombre de la variable de 'partidos' a 'matches'
     matches = get_live_fixtures()
     if not matches:
         logging.info("No hay partidos en vivo en este momento.")
@@ -81,17 +79,16 @@ def check_live_alerts():
         
         competition = match.get("competition", {}).get("name", "Liga")
         
-        # Estructura del mensaje de alerta enviado a Telegram
         mensaje = (
             f"⚽ <b>ALERTA EN DIRECTO</b> ⚽\n\n"
             f"🏆 Competencia: {competition}\n"
             f"⚔️ {home_team} vs {away_team}\n"
             f"📊 Marcador actual: {home_goals} - {away_goals}\n"
         )
-        send_telegram_message(mensaje)
+        send_telegram_message(mensaje)  # CORREGIDO: antes decía 'send_telegram_mensaje'
 
 def main_loop():
-    # Ciclo principal de monitoreo constante
+    # Mensaje inicial de arranque
     send_telegram_message("🤖 Bot actualizado y activo monitoreando partidos sin límite.")
     while True:
         try:
@@ -99,13 +96,10 @@ def main_loop():
         except Exception as e:
             logging.error(f"Error en el ciclo de monitoreo: {e}")
         
-        # Tiempo de espera entre consultas (60 segundos por las limitaciones de cuentas gratis)
         time.sleep(60)
 
 if __name__ == "__main__":
-    # 1. Lanzar el servidor HTTP en un hilo secundario para Render
     http_thread = threading.Thread(target=run_http_server, daemon=True)
     http_thread.start()
     
-    # 2. Iniciar el bucle de monitoreo en el hilo principal
     main_loop()
