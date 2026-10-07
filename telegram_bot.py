@@ -4,23 +4,18 @@ import logging
 import threading
 import requests
 
-# Desactivar advertencias de certificados SSL
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Configuración de logs limpia
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# CLAVE DE FÚTBOL FIJA
 FOOTBALL_DATA_KEY = "6d66424ab2d344bb468b05ec1b115991"
-
 API_URL = "https://football-data.org"
 HEADERS = {
     "X-Auth-Token": FOOTBALL_DATA_KEY
 }
 
 def send_telegram_message(text):
-    # DIRECCIÓN FIJA A TU CANAL REAL TOPTIPS
     url_telegram = "https://telegram.org"
     payload = {
         "chat_id": "@FreeTopTip",
@@ -64,8 +59,8 @@ def check_live_alerts():
         send_telegram_message(mensaje_clasico)
 
 def main_loop():
-    # El bot mandará este mensaje al canal nada más arrancar
-    time.sleep(3)
+    # CORREGIDO: Primero envía el mensaje al canal y luego entra al bucle eterno de fútbol
+    print("Iniciando envío prioritario a Telegram...")
     aviso_arranque = (
         "💬 Compartiré alertas en directo cuando las estadísticas "
         "alcancen los filtros de Goles, Córners, Tarjetas, Valor o Paradas."
