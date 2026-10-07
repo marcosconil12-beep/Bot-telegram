@@ -5,20 +5,24 @@ import threading
 import requests
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 
+# Desactivar advertencias de certificados SSL no verificados
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Variables de entorno (Asegúrate de que se llamen exactamente así en Render)
+# Variables de entorno unificadas a la versión que tienes activa
 TELEGRAM_BOT_TOKEN = os.environ.get("TOKEN_BOT_DE_TELEGRAM")
-FOOTBALL_DATA_KEY = os.environ.get("CLAVE_DE_DATOS_DE_FUTBOL")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+FOOTBALL_DATA_KEY = os.environ.get("CLAVE_DE_DATOS_DE_FUTBOL")
 
 API_URL = "https://football-data.org"
 HEADERS = {
     "X-Auth-Token": FOOTBALL_DATA_KEY
 }
 
-# Servidor HTTP en segundo plano para mantener la app activa en Render
+# Servidor HTTP en segundo plano para Render
 class SimpleHTTPRequestHandlerCustom(SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -52,7 +56,8 @@ def send_telegram_message(text):
 def get_live_fixtures():
     url = f"{API_URL}?status=LIVE"
     try:
-        response = requests.get(url, headers=HEADERS)
+        # CORREGIDO: verify=False se salta el error del certificado SSL de la API
+        response = requests.get(url, headers=HEADERS, verify=False)
         if response.status_code == 200:
             data = response.json()
             return data.get("matches", [])
@@ -85,7 +90,7 @@ def check_live_alerts():
             f"⚔️ {home_team} vs {away_team}\n"
             f"📊 Marcador actual: {home_goals} - {away_goals}\n"
         )
-        send_telegram_message(mensaje)  # CORREGIDO: antes decía 'send_telegram_mensaje'
+        send_telegram_message(mensaje)
 
 def main_loop():
     # Mensaje inicial de arranque
