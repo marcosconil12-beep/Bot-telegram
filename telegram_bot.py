@@ -5,17 +5,17 @@ import threading
 import requests
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 
-# Desactivar advertencias de certificados SSL no verificados
+# Desactivar advertencias de certificados SSL no verificados de la API
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Variables de entorno unificadas a la versión que tienes activa
-TELEGRAM_BOT_TOKEN = os.environ.get("TOKEN_BOT_DE_TELEGRAM")
+# CORREGIDO: Enlazado exacto con tus variables de Render
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-FOOTBALL_DATA_KEY = os.environ.get("CLAVE_DE_DATOS_DE_FUTBOL")
+FOOTBALL_DATA_KEY = os.environ.get("API_FOOTBALL_KEY")
 
 API_URL = "https://football-data.org"
 HEADERS = {
@@ -56,7 +56,7 @@ def send_telegram_message(text):
 def get_live_fixtures():
     url = f"{API_URL}?status=LIVE"
     try:
-        # CORREGIDO: verify=False se salta el error del certificado SSL de la API
+        # Se mantiene verify=False para saltar el fallo de seguridad SSL de la API
         response = requests.get(url, headers=HEADERS, verify=False)
         if response.status_code == 200:
             data = response.json()
@@ -93,7 +93,7 @@ def check_live_alerts():
         send_telegram_message(mensaje)
 
 def main_loop():
-    # Mensaje inicial de arranque
+    # Mensaje inicial de arranque que llegará a tu canal
     send_telegram_message("🤖 Bot actualizado y activo monitoreando partidos sin límite.")
     while True:
         try:
