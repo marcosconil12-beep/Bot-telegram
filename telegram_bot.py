@@ -10,17 +10,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-FOOTBALL_DATA_KEY = os.environ.get("FOOTBALL_DATA_KEY")
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-
-FOOTBALL_API_URL = "https://api.football-data.org/v4/matches"
 
 sent_alerts = set()
 sent_odds_alerts = set()
 
 # Diccionario para rastrear partidos pendientes de resultado
-# Estructura: { event_id: { "home_team": ..., "away_team": ..., "target_team": ..., "price": ..., "message_id": ... } }
 pending_bets = {}
 
 # Servidor HTTP para mantener Render activo
@@ -28,7 +24,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot activo con seguimiento de aciertos 24/7")
+        self.wfile.write(b"Bot activo con sistema Live + Pre-match 24/7")
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -95,49 +91,58 @@ def generar_argumentacion(equipo, rival, cuota, casa):
         f"💡 *Justificación del Pick:*\n{razon}"
     )
 
-# 1. ALERTAS EN DIRECTO (Football-Data)
+# 1. ALERTAS EN DIRECTO GLOBAL (The Odds API)
 def check_live_alerts():
-    if not FOOTBALL_DATA_KEY:
-        return
-    
-    headers = {"X-Auth-Token": FOOTBALL_DATA_KEY}
-    url = f"{FOOTBALL_API_URL}?status=IN_PLAY"
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            matches = response.json().get("matches", [])
-        else:
-            return
-    except Exception as e:
-        logging.error(f"Error al consultar Football-Data: {e}")
+    if not ODDS_API_KEY:
         return
 
-    for match in matches:
-        match_id = match["id"]
-        if match_id in sent_alerts:
+    url = f"https://api.the-odds-api.com/v4/sports/soccer/scores/?apiKey={ODDS_API_KEY}&daysFrom=1"
+
+    try:
+        response = requests.get(url, timeout=12)
+        if response.status_code != 200:
+            return
+        events = response.json()
+    except Exception as e:
+        logging.error(f"Error consultando partidos Live: {e}")
+        return
+
+    for event in events:
+        event_id = event.get("id")
+        if event_id in sent_alerts:
             continue
 
-        home_team = match["homeTeam"]["name"]
-        away_team = match["awayTeam"]["name"]
-        competition = match.get("competition", {}).get("name", "Liga")
-        
-        score = match.get("score", {}).get("fullTime", {})
-        home_goals = score.get("home") or 0
-        away_goals = score.get("away") or 0
-        total_goals = home_goals + away_goals
+        # Verificar si el partido está en juego (no finalizado y con marcadores activos)
+        completed = event.get("completed", False)
+        scores = event.get("scores")
 
-        if total_goals <= 1:
-            msg = (
-                f"🚨 *ALERTA EN DIRECTO* 🚨\n\n"
-                f"🏆 *Liga:* {competition}\n"
-                f"⚽ *Partido:* {home_team} vs {away_team}\n"
-                f"📊 *Marcador:* {home_goals} - {away_goals}\n\n"
-                f"🔥 *Oportunidad Live:* Encuentro trabado con baja cifra de goles, "
-                f"ideal para vigilar líneas de gol en el segundo tiempo."
-            )
-            send_telegram_message(msg)
-            sent_alerts.add(match_id)
+        if not completed and scores and len(scores) >= 2:
+            home_team = event.get("home_team")
+            away_team = event.get("away_team")
+            sport_title = event.get("sport_title", "Fútbol Live")
+
+            home_score = 0
+            away_score = 0
+            for score in scores:
+                if score.get("name") == home_team:
+                    home_score = int(score.get("score", 0))
+                elif score.get("name") == away_team:
+                    away_score = int(score.get("score", 0))
+
+            total_goals = home_score + away_score
+
+            # Filtro Live: Partidos trabados o empatados con pocos goles (oportunidad de valor)
+            if total_goals <= 1:
+                msg = (
+                    f"🚨 *ALERTA EN DIRECTO (GLOBAL)* 🚨\n\n"
+                    f"🏆 *Competición:* {sport_title}\n"
+                    f"⚔️ *Encuentro:* {home_team} vs {away_team}\n"
+                    f"📊 *Marcador Actual:* {home_score} - {away_score}\n\n"
+                    f"🔥 *Análisis Live:* Partido en curso con bajo registro de goles ({total_goals} goles). "
+                    f"Oportunidad detectada para monitorear líneas de Over / Gol en directo."
+                )
+                send_telegram_message(msg)
+                sent_alerts.add(event_id)
 
 # 2. PRONÓSTICOS PRE-MATCH CON CUOTAS REALES >= 1.80€
 def check_value_bets_with_odds():
@@ -215,7 +220,6 @@ def check_value_bets_with_odds():
             msg_id = send_telegram_message(msg)
             sent_odds_alerts.add(event_id)
 
-            # Guardar en la lista de apuestas pendientes para verificar el resultado
             if msg_id:
                 pending_bets[event_id] = {
                     "home_team": home_team,
@@ -261,7 +265,6 @@ def check_completed_results():
                 elif score.get("name") == bet_info["away_team"]:
                     away_score = int(score.get("score", 0))
 
-            # Determinar ganador
             if home_score > away_score:
                 winner = bet_info["home_team"]
             elif away_score > home_score:
@@ -290,19 +293,17 @@ def check_completed_results():
                     f"📊 *Ganador real:* {winner}"
                 )
 
-            # Responder directamente al mensaje original del pick
             send_telegram_message(result_msg, reply_to_message_id=msg_id)
             completed_ids.append(event_id)
 
-    # Eliminar de pendientes los ya procesados
     for eid in completed_ids:
         del pending_bets[eid]
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Bot en marcha con módulo de seguimiento de resultados...")
+    logging.info("Bot en marcha con módulo Live Global...")
     
-    init_msg = "🤖 *Bot TOPTIPS Actualizado*\n\n✅ Sistema de verificación de aciertos (GREEN/RED) activado."
+    init_msg = "🤖 *Bot TOPTIPS Actualizado*\n\n✅ Módulo Live Global habilitado.\n✅ Verificación de aciertos (GREEN/RED) activada."
     send_telegram_message(init_msg)
 
     while True:
