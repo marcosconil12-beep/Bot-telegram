@@ -3,7 +3,6 @@ import time
 import logging
 import threading
 import requests
-from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Configuración de logs
@@ -101,7 +100,6 @@ def check_value_bets_with_odds():
         logging.warning("ODDS_API_KEY no configurada. Saltando búsqueda de cuotas.")
         return
 
-    # Consultamos cuotas para fútbol en vivo y próximos eventos
     url = f"https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal"
 
     try:
@@ -128,7 +126,6 @@ def check_value_bets_with_odds():
         if not bookmakers:
             continue
 
-        # Buscamos la mejor cuota entre las casas disponibles
         best_home_price = 0
         best_away_price = 0
         bookie_name = ""
@@ -146,7 +143,6 @@ def check_value_bets_with_odds():
                         elif outcome.get("name") == away_team and price > best_away_price:
                             best_away_price = price
 
-        # FILTRO DE SEGURIDAD: Solo si la cuota es >= 1.80€
         target_team = None
         target_price = 0
 
@@ -169,10 +165,23 @@ def check_value_bets_with_odds():
             )
             send_telegram_message(msg)
             sent_odds_alerts.add(event_id)
-            break # Publica 1 pronóstico por ciclo para evitar spam
+            break
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
     logging.info("Bot en marcha con soporte para cuotas reales >= 1.80€...")
     
-    send_telegram_message("🤖 Bot actualizado: Sistema de filtrado por Cuotas Reales (>= 1.80€
+    start_msg = "🤖 Bot actualizado: Sistema de filtrado por Cuotas Reales (>= 1.80€) activado."
+    send_telegram_message(start_msg)
+
+    while True:
+        try:
+            check_live_alerts()
+            check_value_bets_with_odds()
+        except Exception as e:
+            logging.error(f"Error en bucle principal: {e}")
+
+        time.sleep(300)
+
+if __name__ == "__main__":
+    main()
