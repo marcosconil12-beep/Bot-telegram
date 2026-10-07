@@ -1,21 +1,34 @@
 import os
 import time
 import logging
+import threading
 import requests
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY")
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")  # O el ID de tu canal/grupo
+FOOTBALL_DATA_KEY = os.environ.get("FOOTBALL_DATA_KEY")
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-API_URL = "https://v3.football.api-sports.io"
+API_URL = "https://api.football-data.org/v4/matches"
 HEADERS = {
-    "x-rapidapi-host": "v3.football.api-sports.io",
-    "x-rapidapi-key": API_FOOTBALL_KEY
+    "X-Auth-Token": FOOTBALL_DATA_KEY
 }
+
+# Servidor HTTP en segundo plano para Render
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot activo")
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler)
+    server.serve_forever()
 
 def send_telegram_message(text):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
@@ -34,49 +47,49 @@ def send_telegram_message(text):
         logging.error(f"Error enviando mensaje a Telegram: {e}")
 
 def get_live_fixtures():
-    url = f"{API_URL}/fixtures?live=all"
+    # Consulta los partidos que están en directo (status IN_PLAY o PAUSED)
+    url = f"{API_URL}?status=IN_PLAY"
     try:
         response = requests.get(url, headers=HEADERS)
-        data = response.json()
-        return data.get("response", [])
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("matches", [])
+        else:
+            logging.error(f"Error API Football-Data: {response.status_code}")
+            return []
     except Exception as e:
-        logging.error(f"Error consultando API-Football: {e}")
+        logging.error(f"Error consultando Football-Data: {e}")
         return []
 
 def check_live_alerts():
-    fixtures = get_live_fixtures()
-    for fix in fixtures:
-        fixture_id = fix["fixture"]["id"]
-        elapsed = fix["fixture"]["status"]["elapsed"] or 0
-        teams = fix["teams"]
-        goals = fix["goals"]
+    matches = get_live_fixtures()
+    for match in matches:
+        home_team = match["homeTeam"]["name"]
+        away_team = match["awayTeam"]["name"]
         
-        # Extraer estadísticas del partido si están disponibles
-        stats = fix.get("statistics", [])
-        if not stats or len(stats) < 2:
-            continue
+        score = match.get("score", {}).get("fullTime", {})
+        home_goals = score.get("home", 0) or 0
+        away_goals = score.get("away", 0) or 0
+        
+        competition = match.get("competition", {}).get("name", "Liga")
 
-        # Formatear datos principales
-        home_team = teams["home"]["name"]
-        away_team = teams["away"]["name"]
-        home_goals = goals["home"] or 0
-        away_goals = goals["away"] or 0
-
-        # Alerta personalizada predeterminada
-        # Ajusta las condiciones según tus reglas personales
-        if 30 <= elapsed <= 75 and (home_goals + away_goals) <= 1:
+        # Filtro: total de goles en el partido <= 1
+        if (home_goals + away_goals) <= 1:
             msg = (
                 f"🚨 <b>ALERTA EN DIRECTO</b> 🚨\n\n"
+                f"🏆 <b>{competition}</b>\n"
                 f"⚽ <b>{home_team} vs {away_team}</b>\n"
-                f"⏱ Minuto: {elapsed}' | Resultado: {home_goals} - {away_goals}\n\n"
-                f"🔥 ¡Oportunidad detectada según la presión del partido!\n"
-                f"👉 Revisa las líneas de córners/goles en tu casa de apuestas favorita."
+                f"📊 Marcador actual: {home_goals} - {away_goals}\n\n"
+                f"🔥 ¡Oportunidad detectada!"
             )
             send_telegram_message(msg)
 
 def main():
-    logging.info("Bot con redacción personal iniciado...")
-    send_telegram_message("🤖 Bot iniciado correctamente y activo para monitorear partidos.")
+    # Servidor HTTP para evitar errores en Render
+    threading.Thread(target=run_http_server, daemon=True).start()
+    
+    logging.info("Bot iniciado con Football-Data...")
+    send_telegram_message("🤖 Bot actualizado a Football-Data y activo monitoreando partidos sin límites.")
     
     while True:
         try:
@@ -84,7 +97,7 @@ def main():
         except Exception as e:
             logging.error(f"Error en el bucle principal: {e}")
         
-        # Espera 3 minutos entre revisiones
+        # Revisa cada 3 minutos sin agotar el límite
         time.sleep(180)
 
 if __name__ == "__main__":
