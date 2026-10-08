@@ -72,18 +72,18 @@ def create_premium_image(match_text, league_text):
     d = ImageDraw.Draw(img)
     
     d.rectangle([20, 20, 780, 430], outline=(234, 179, 8), width=4)
-    d.text((40, 50), "🔥 PICK PREMIUM STAKE 5 EXCLUSIVO 🔥", fill=(234, 179, 8))
-    d.text((40, 120), f"Competición: {league_text}", fill=(255, 255, 255))
+    d.text((40, 50), "PICK PREMIUM STAKE 5 EXCLUSIVO", fill=(234, 179, 8))
+    d.text((40, 120), f"Competicion: {league_text}", fill=(255, 255, 255))
     d.text((40, 180), f"Encuentro: {match_text}", fill=(255, 255, 255))
-    d.text((40, 250), "Pronóstico: CONFIDENCIAL / MÁXIMO VALOR", fill=(34, 197, 94))
-    d.text((40, 320), "Precio: 9,99€", fill=(234, 179, 8))
-    d.text((40, 370), "Adquiérelo contactando a: @Mark122", fill=(148, 163, 184))
+    d.text((40, 250), "Pronostico: CONFIDENCIAL / MAXIMO VALOR", fill=(34, 197, 94))
+    d.text((40, 320), "Precio: 9,99 EUR", fill=(234, 179, 8))
+    d.text((40, 370), "Adquierelo contactando a: @Mark122", fill=(148, 163, 184))
     
     filename = "premium_pick.png"
     img.save(filename)
     return filename
 
-# Servidor HTTP con función de disparo Web para Live
+# Servidor HTTP con función de disparo Web para Live corregida
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed_url = urlparse(self.path)
@@ -110,11 +110,12 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
-            self.wfile.write(b"<h1>✅ Pick Live Enviado a Telegram</h1>")
+            self.wfile.write("<h1>Pick Live Enviado a Telegram Corregido</h1>".encode('utf-8'))
         else:
             self.send_response(200)
+            self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
-            self.wfile.write(b"Bot TOPTIPS Multi-Mercado & Combinadas Active")
+            self.wfile.write("Bot TOPTIPS Multi-Mercado & Combinadas Active".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -237,7 +238,6 @@ def check_multimarket_value_picks():
             if not bookmakers:
                 continue
 
-            # Rotación de mercados limpia y profesional
             market_options = [
                 ("1X2 - Victoria Local", f"Victoria de {home}", 1.85),
                 ("Total de Goles", "Más de 2.5 Goles", 1.95),
@@ -263,7 +263,7 @@ def check_multimarket_value_picks():
             msg_id = send_telegram_message(msg)
             if msg_id:
                 sent_alerts.add(alert_key)
-                return  # Envía un pick variado por ciclo para no saturar
+                return
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
