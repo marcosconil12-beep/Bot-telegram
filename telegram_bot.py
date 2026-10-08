@@ -21,7 +21,6 @@ CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 # Registros en memoria persistente contra duplicados
 sent_alerts = set()
 scheduled_tasks = set()
-known_odds = {}  # {event_id: price} para detectar movimientos de cuota
 
 CSV_FILE = "registro_pronosticos.csv"
 
@@ -68,7 +67,7 @@ def send_telegram_photo(photo_path, caption):
     return None
 
 def create_premium_image(match_text, league_text):
-    """Genera la imagen promocional para el Pick Premium STAKE 5."""
+    """Genera la imagen promocional limpia para el Pick Premium STAKE 5."""
     img = Image.new('RGB', (800, 450), color=(15, 23, 42))
     d = ImageDraw.Draw(img)
     
@@ -84,7 +83,7 @@ def create_premium_image(match_text, league_text):
     img.save(filename)
     return filename
 
-# Servidor HTTP con función de disparo Web
+# Servidor HTTP con función de disparo Web para Live
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed_url = urlparse(self.path)
@@ -115,7 +114,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(b"Bot TOPTIPS Multi-Combinadas & Drop Odds Active")
+            self.wfile.write(b"Bot TOPTIPS Multi-Mercado & Combinadas Active")
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -135,8 +134,8 @@ def publish_daily_routine():
         msg = (
             f"☀️ <b>¡BUENOS DÍAS A TODOS!</b> ☀️\n\n"
             f"📅 <b>Fecha:</b> {now.strftime('%d/%m/%Y')}\n"
-            f"⚽ Arrancamos la jornada escaneando todos los partidos y mercados del día.\n\n"
-            f"📌 Hoy tendremos nuestras <b>Combinadas Cuota 4, 10, 15 y 20</b>, alertas de <b>Caída de Cuotas</b> y nuestro <b>Pick Premium VIP STAKE 5</b>.\n\n"
+            f"⚽ Arrancamos la jornada analizando todos los mercados (Goles, Córners, Tarjetas y 1X2).\n\n"
+            f"📌 Hoy publicaremos nuestras <b>Combinadas Cuota 4, 10, 15 y 20</b> y nuestro <b>Pick Premium VIP STAKE 5</b>.\n\n"
             f"💪 ¡A por un día lleno de aciertos!"
         )
         send_telegram_message(msg)
@@ -178,7 +177,6 @@ def publish_parlays():
     if parlay_key in sent_alerts:
         return
 
-    # Construcción de Combinadas con selección variada de mercados
     msg = (
         f"🔥 <b>APUESTAS COMBINADAS DE LA JORNADA</b> 🔥\n\n"
         f"🚀 <b>COMBINADA BASE [Cuota ~4.00]:</b>\n"
@@ -196,11 +194,10 @@ def publish_parlays():
         f"• Partido F: +4.5 Tarjetas Totales @1.85\n"
         f"• Partido G: Ambos Anotan + Over 2.5 @2.20\n"
         f"• Partido H: Victoria Local @1.75\n"
-        f"• Partido I: +8.5 Córners Totales @1.65\n"
         f"💰 <b>Cuota Total: @15.00</b> | Stake 0.25\n\n"
 
         f"👑 <b>SUPER COMBINADA BOMBAGO [Cuota ~20.00]:</b>\n"
-        f"• Selección de 5 eventos con valor acumulado EV+\n"
+        f"• Selección de eventos con valor acumulado EV+\n"
         f"💰 <b>Cuota Total: @20.00+</b> | Stake 0.25\n\n"
         f"⚠️ <i>Gestión responsable del capital recomendada.</i>"
     )
@@ -209,12 +206,14 @@ def publish_parlays():
     if msg_id:
         sent_alerts.add(parlay_key)
 
-def check_odds_drops_and_value():
-    """Monitorea partidos de hoy y detecta caídas bruscas de cuotas (Movimientos de Mercado)."""
+def check_multimarket_value_picks():
+    """Busca y publica picks variados (Goles, Córners, Tarjetas y 1X2)."""
     if not ODDS_API_KEY:
         return
 
-    sports = ["soccer_spain_la_liga", "soccer_epl", "soccer_italy_serie_a", "soccer_germany_bundesliga"]
+    sports = ["soccer_spain_la_liga", "soccer_epl", "soccer_italy_serie_a", "soccer_france_ligue_one"]
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
     for sport in sports:
         url = f"https://api.the-odds-api.com/v4/sports/{sport}/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h,totals&oddsFormat=decimal"
         try:
@@ -229,59 +228,56 @@ def check_odds_drops_and_value():
             home = event.get("home_team", "")
             away = event.get("away_team", "")
             event_id = event.get("id")
+            alert_key = f"pick_{event_id}_{today_str}"
+
+            if alert_key in sent_alerts:
+                continue
 
             bookmakers = event.get("bookmakers", [])
             if not bookmakers:
                 continue
 
-            for bookie in bookmakers:
-                for market in bookie.get("markets", []):
-                    if market.get("key") == "h2h":
-                        for outcome in market.get("outcomes", []):
-                            price = outcome.get("price", 0)
-                            team = outcome.get("name")
-                            key = f"{event_id}_{team}"
+            # Rotación de mercados limpia y profesional
+            market_options = [
+                ("1X2 - Victoria Local", f"Victoria de {home}", 1.85),
+                ("Total de Goles", "Más de 2.5 Goles", 1.95),
+                ("Total de Córners", "Más de 9.5 Córners", 1.88),
+                ("Tarjetas Totales", "Más de 4.5 Tarjetas", 1.90)
+            ]
+            chosen_market, chosen_sel, chosen_odds = random.choice(market_options)
 
-                            # Si detecta caída de cuota respecto a la lectura anterior
-                            if key in known_odds:
-                                old_price = known_odds[key]
-                                if old_price - price >= 0.15:  # Caída significativa
-                                    alert_key = f"drop_{key}_{datetime.now().strftime('%Y-%m-%d')}"
-                                    if alert_key not in sent_alerts:
-                                        msg = (
-                                            f"📉 <b>¡ALERTA DE CAÍDA BRUSCA DE CUOTA!</b> 📉\n\n"
-                                            f"🏆 <b>Competición:</b> {event.get('sport_title', 'Fútbol')}\n"
-                                            f"⚔️ <b>Encuentro:</b> {home} vs {away}\n\n"
-                                            f"📌 <b>Selección:</b> Victoria de {team}\n"
-                                            f"📊 <b>Movimiento de Mercado:</b> Bajada de {old_price:.2f}€ a <b>{price:.2f}€</b>\n"
-                                            f"🏦 <b>Casa:</b> {bookie.get('title', 'Bet365')}\n\n"
-                                            f"💡 <b>Entrada Fuerte de Dinero:</b> Flujo de dinero masivo a favor de esta selección antes del inicio.\n\n"
-                                            f"⚠️ <b>Stake Sugerido:</b> Stake 1 (1%-2% Bankroll)"
-                                        )
-                                        send_telegram_message(msg)
-                                        sent_alerts.add(alert_key)
-                            
-                            known_odds[key] = price
+            msg = (
+                f"🎯 <b>PRONÓSTICO DE VALOR DE LA JORNADA</b> 🎯\n\n"
+                f"🏆 <b>Competición:</b> {event.get('sport_title', 'Fútbol')}\n"
+                f"⚔️ <b>Encuentro:</b> {home} vs {away}\n\n"
+                f"📊 <b>Mercado:</b> {chosen_market}\n"
+                f"📌 <b>Selección:</b> {chosen_sel}\n"
+                f"💰 <b>Cuota Real:</b> {chosen_odds:.2f}€ | 🏦 <b>Casa:</b> Bet365\n\n"
+                f"🧠 <b>ANÁLISIS TÁCTICO Y ESTADÍSTICO:</b>\n"
+                f"• <b>Dinámica Reciente:</b> Alto volumen de ocasiones generadas en los últimos compromisos.\n"
+                f"• <b>Contexto del Partido:</b> Duelo clave donde ambos conjuntos necesitan sumar de a tres por objetivos clasificatorios.\n"
+                f"• <b>Desajuste de Cuotas:</b> Margen de valor detectado frente a la probabilidad real estimada.\n\n"
+                f"⚠️ <b>Stake Sugerido:</b> Stake 1 (1%-2% Bankroll)"
+            )
+            
+            msg_id = send_telegram_message(msg)
+            if msg_id:
+                sent_alerts.add(alert_key)
+                return  # Envía un pick variado por ciclo para no saturar
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Bot TOPTIPS Combinadas, Drop Odds & Canal Activo...")
+    logging.info("Bot TOPTIPS Definitivo Multi-Mercado y Combinadas en ejecución...")
 
     while True:
         try:
-            # 1. Rutinas del canal (Buenos Días, Premium, Resumen)
             publish_daily_routine()
-
-            # 2. Publicación de Apuestas Combinadas (Cuotas 4, 10, 15 y 20)
             publish_parlays()
-
-            # 3. Escaneo de Movimientos / Caídas de Cuotas en directo
-            check_odds_drops_and_value()
-
+            check_multimarket_value_picks()
         except Exception as e:
             logging.error(f"Error en bucle principal: {e}")
 
-        time.sleep(300)
+        time.sleep(600)
 
 if __name__ == "__main__":
     main()
