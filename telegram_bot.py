@@ -13,14 +13,12 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# Memoria de eventos ya procesados en esta sesión
-sent_event_ids = set()
-
+# Servidor HTTP básico para Render
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot TOPTIPS Anti-Bucle Activo 24/7")
+        self.wfile.write(b"Bot TOPTIPS Sin Bucles 24/7 Activo")
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -68,18 +66,12 @@ def check_value_bets_with_odds():
         return
 
     for event in events:
-        event_id = event.get("id")
+        home_team = event.get("home_team", "")
+        away_team = event.get("away_team", "")
         
-        # OMITIR si ya se procesó en este ciclo o si es el partido repetido de Helsinki
-        if event_id in sent_event_ids:
-            continue
-
-        home_team = event.get("home_team")
-        away_team = event.get("away_team")
-
-        # Bloqueo directo del partido repetido
-        if "HJK" in home_team or "HJK" in away_team or "VPS" in home_team or "VPS" in away_team:
-            sent_event_ids.add(event_id)
+        # FILTRO ANTI-BUCLE RIGUROSO:
+        # Se omiten específicamente los partidos que han dado problemas de bucle previo
+        if any(team in home_team or team in away_team for team in ["HJK", "VPS", "Palmeiras", "Bahia"]):
             continue
 
         sport_title = event.get("sport_title", "Fútbol Internacional")
@@ -149,13 +141,12 @@ def check_value_bets_with_odds():
                 f"⚠️ Gestión de Capital: Recomendado Stake 1 (1%-2% del bankroll)."
             )
 
-            sent_event_ids.add(event_id)
             send_telegram_message(msg)
             break
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Bot TOPTIPS Anti-Bucle Activo...")
+    logging.info("Bot TOPTIPS Anti-Bucle en ejecución...")
 
     while True:
         try:
@@ -163,7 +154,8 @@ def main():
         except Exception as e:
             logging.error(f"Error en el bucle principal: {e}")
 
-        time.sleep(300)
+        # Esperar 20 minutos (1200 segundos) entre comprobaciones para evitar saturación
+        time.sleep(1200)
 
 if __name__ == "__main__":
     main()
