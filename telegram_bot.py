@@ -13,9 +13,8 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# Memoria local temporal
-sent_alerts = set()
-last_sent_text = ""
+# Memoria de eventos ya procesados en esta sesión
+sent_event_ids = set()
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -28,17 +27,11 @@ def run_http_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
-def send_telegram_message(text, reply_to_message_id=None):
-    global last_sent_text
+def send_telegram_message(text):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
         logging.error("TELEGRAM_BOT_TOKEN o CHAT_ID no están configurados.")
         return None
     
-    # Control anti-duplicados estricto
-    if text == last_sent_text:
-        logging.info("Mensaje duplicado bloqueado. No se enviará a Telegram.")
-        return None
-
     clean_chat_id = str(CHAT_ID).strip().replace('"', '').replace("'", "")
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     
@@ -47,15 +40,11 @@ def send_telegram_message(text, reply_to_message_id=None):
         "text": text
     }
     
-    if reply_to_message_id:
-        payload["reply_to_message_id"] = reply_to_message_id
-    
     try:
         res = requests.post(url, json=payload, timeout=10)
         res_data = res.json()
         if res_data.get("ok"):
             logging.info("Mensaje enviado con éxito a Telegram.")
-            last_sent_text = text
             return res_data.get("result", {}).get("message_id")
         else:
             logging.error(f"Error de Telegram: {res_data}")
@@ -63,7 +52,6 @@ def send_telegram_message(text, reply_to_message_id=None):
         logging.error(f"Error enviando mensaje a Telegram: {e}")
     return None
 
-# 1. PRONÓSTICOS PRE-MATCH MULTI-MERCADO
 def check_value_bets_with_odds():
     if not ODDS_API_KEY:
         return
@@ -81,13 +69,20 @@ def check_value_bets_with_odds():
 
     for event in events:
         event_id = event.get("id")
-        if event_id in sent_alerts:
+        
+        # OMITIR si ya se procesó en este ciclo o si es el partido repetido de Helsinki
+        if event_id in sent_event_ids:
             continue
 
         home_team = event.get("home_team")
         away_team = event.get("away_team")
-        sport_title = event.get("sport_title", "Fútbol Internacional")
 
+        # Bloqueo directo del partido repetido
+        if "HJK" in home_team or "HJK" in away_team or "VPS" in home_team or "VPS" in away_team:
+            sent_event_ids.add(event_id)
+            continue
+
+        sport_title = event.get("sport_title", "Fútbol Internacional")
         bookmakers = event.get("bookmakers", [])
         if not bookmakers:
             continue
@@ -154,7 +149,7 @@ def check_value_bets_with_odds():
                 f"⚠️ Gestión de Capital: Recomendado Stake 1 (1%-2% del bankroll)."
             )
 
-            sent_alerts.add(event_id)
+            sent_event_ids.add(event_id)
             send_telegram_message(msg)
             break
 
@@ -168,7 +163,7 @@ def main():
         except Exception as e:
             logging.error(f"Error en el bucle principal: {e}")
 
-        time.sleep(300) # Consulta cada 5 minutos
+        time.sleep(300)
 
 if __name__ == "__main__":
     main()
