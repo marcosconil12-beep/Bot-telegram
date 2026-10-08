@@ -12,37 +12,37 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
-FOOTBALL_API_KEY = os.environ.get("FOOTBALL_API_KEY") # API-Sports Key opcional
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 DB_FILE = "pending_bets.json"
 
-sent_live_alerts = set()
-sent_odds_alerts = set()
-
-def load_pending_bets():
+# Funciones de persistencia en disco
+def load_db():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r") as f:
                 return json.load(f)
         except Exception as e:
             logging.error(f"Error cargando base de datos: {e}")
-    return {}
+    return {"sent_live": [], "sent_odds": [], "pending_bets": {}}
 
-def save_pending_bets(data):
+def save_db(data):
     try:
         with open(DB_FILE, "w") as f:
             json.dump(data, f)
     except Exception as e:
         logging.error(f"Error guardando base de datos: {e}")
 
-pending_bets = load_pending_bets()
+db_data = load_db()
+sent_live_alerts = set(db_data.get("sent_live", []))
+sent_odds_alerts = set(db_data.get("sent_odds", []))
+pending_bets = db_data.get("pending_bets", {})
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot TOPTIPS Over 0.5 HT Live Activo 24/7")
+        self.wfile.write(b"Bot TOPTIPS Sin Bucles 24/7 Activo")
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -77,7 +77,14 @@ def send_telegram_message(text, reply_to_message_id=None):
         logging.error(f"Error enviando mensaje a Telegram: {e}")
     return None
 
-# 1. ESTRATEGIA LIVE: OVER 0.5 GOLES 1ª PARTE (MINUTO 30-45 Y MARCADOR 0-0)
+def update_db_file():
+    save_db({
+        "sent_live": list(sent_live_alerts),
+        "sent_odds": list(sent_odds_alerts),
+        "pending_bets": pending_bets
+    })
+
+# 1. ESTRATEGIA LIVE: OVER 0.5 GOLES 1ª PARTE (HT)
 def check_live_alerts_ht():
     if not ODDS_API_KEY:
         return
@@ -114,7 +121,6 @@ def check_live_alerts_ht():
                 elif score.get("name") == away_team:
                     away_score = int(score.get("score", 0))
 
-            # Filtro: Partido 0 - 0 en juego
             if home_score == 0 and away_score == 0:
                 msg = (
                     f"🔥 ALERTA LIVE: OVER 0.5 GOLES 1ª PARTE (HT) 🔥\n\n"
@@ -131,6 +137,7 @@ def check_live_alerts_ht():
                 )
                 send_telegram_message(msg)
                 sent_live_alerts.add(event_id)
+                update_db_file()
 
 # 2. PRONÓSTICOS PRE-MATCH MULTI-MERCADO
 def check_value_bets_with_odds():
@@ -234,7 +241,8 @@ def check_value_bets_with_odds():
                     "price": selected_bet["cuota"],
                     "message_id": msg_id
                 }
-                save_pending_bets(pending_bets)
+            
+            update_db_file()
             break
 
 # 3. VERIFICAR RESULTADOS Y PUBLICAR ACIERTOS / FALLOS
@@ -307,15 +315,13 @@ def check_completed_results():
     if completed_ids:
         for eid in completed_ids:
             del pending_bets[eid]
-        save_pending_bets(pending_bets)
+        update_db_file()
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Bot TOPTIPS Estrategia Over 0.5 HT en marcha...")
+    logging.info("Bot TOPTIPS con memoria permanente activado...")
     
-    init_msg = "🤖 Bot TOPTIPS Actualizado\n\n🔥 Módulo Live Activo: Estrategia Over 0.5 Goles en la 1ª Parte (0-0 Min 30-45) con análisis de presión."
-    send_telegram_message(init_msg)
-
+    # Mensaje de inicio desactivado para evitar notificaciones innecesarias en cada reinicio
     while True:
         try:
             check_live_alerts_ht()
@@ -324,7 +330,7 @@ def main():
         except Exception as e:
             logging.error(f"Error en el bucle principal: {e}")
 
-        time.sleep(180) # Consulta cada 3 minutos para no perder oportunidades en vivo
+        time.sleep(180)
 
 if __name__ == "__main__":
     main()
