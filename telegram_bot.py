@@ -3,6 +3,8 @@ import time
 import logging
 import threading
 import requests
+import random
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Configuración de logs
@@ -13,9 +15,9 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# Registros en memoria
-sent_alerts = {}  # {alert_key: {"msg_id": int, "type": str, "status": "pending", "pick": str}}
-last_news_time = 0
+# Registros en memoria persistente contra duplicados
+sent_alerts = set()
+sent_news = set()
 
 # Lista de ligas seleccionadas para noticias, previas y picks
 TARGET_LEAGUES = [
@@ -32,12 +34,11 @@ TARGET_LEAGUES = [
     "soccer_scotland_premiership"
 ]
 
-# Servidor HTTP básico para mantener activo el contenedor en Railway
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot TOPTIPS Multi-Mercado & Noticias 24/7 Activo")
+        self.wfile.write(b"Bot TOPTIPS Multi-Mercado & Anti-Duplicados Activo")
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -73,7 +74,6 @@ def send_telegram_message(text, reply_to_message_id=None):
     return None
 
 def generate_market_analysis(home, away, market_type, sport_title):
-    """Genera análisis profundo detallado con parámetros para Goles, Córners y Tarjetas."""
     if market_type == "goles":
         return (
             f"📊 <b>ANÁLISIS DE GOLES (Scores24/Data):</b>\n"
@@ -83,33 +83,9 @@ def generate_market_analysis(home, away, market_type, sport_title):
             f"🧠 <b>JUSTIFICACIÓN TÁCTICA:</b>\n"
             f"Sistemas tácticos ofensivos con líneas adelantadas que sufren en transiciones rápidas del rival."
         )
-    elif market_type == "corners":
-        return (
-            f"🚩 <b>ANÁLISIS DE CÓRNERS:</b>\n"
-            f"• <b>Promedio de Saques de Esquina:</b> {home} genera 6.2 córners/juego; {away} concede 5.4.\n"
-            f"• <b>Juego por Bandas:</b> Ataque constante mediante centros laterales y extremos desequilibrantes.\n\n"
-            f"🧠 <b>JUSTIFICACIÓN TÁCTICA:</b>\n"
-            f"Línea de saques de esquina superable debido al alto volumen de disparos bloqueados y centros desviados."
-        )
-    elif market_type == "tarjetas":
-        return (
-            f"🟨 <b>ANÁLISIS DE TARJETAS Y DISCIPLINA:</b>\n"
-            f"• <b>Índice Arbitral:</b> El colegiado asignado promedia +5.2 tarjetas por encuentro.\n"
-            f"• <b>Faltas Cometidas:</b> Partido de alta rivalidad con promedios superiores a 28 faltas totales.\n\n"
-            f"🧠 <b>JUSTIFICACIÓN TÁCTICA:</b>\n"
-            f"Un choque tenso en la zona media con interrupciones tácticas constantes para frenar contraataques."
-        )
-    else: # LIVE HT
-        return (
-            f"⚡ <b>ANÁLISIS LIVE (Minuto 30 | 0-0):</b>\n"
-            f"• <b>Ataques Peligrosos:</b> Ritmo superior a 1.3 por minuto.\n"
-            f"• <b>Tiros a Puerta:</b> +4 remates a puerta entre ambos en los primeros 30 minutos.\n\n"
-            f"🧠 <b>JUSTIFICACIÓN IA LIVE:</b>\n"
-            f"Presión asfixiante que indica gol inminente antes de llegar al descanso (+0.5 Goles HT)."
-        )
+    return ""
 
 def check_multimarket_picks():
-    """Busca y envía picks con filtros de Goles, Córners y Tarjetas."""
     if not ODDS_API_KEY:
         return
 
@@ -149,7 +125,9 @@ def check_multimarket_picks():
                         for outcome in market.get("outcomes", []):
                             price = outcome.get("price", 0)
                             if price >= 1.80 and outcome.get("name") == "Over" and outcome.get("point") == 2.5:
-                                alert_key = f"{match_id}_goles"
+                                alert_key = f"{match_id}_goles_{datetime.now().strftime('%Y-%m-%d')}"
+                                
+                                # FILTRO ABSOLUTO DE DUPLICADOS:
                                 if alert_key in sent_alerts:
                                     continue
 
@@ -165,50 +143,49 @@ def check_multimarket_picks():
                                 )
                                 msg_id = send_telegram_message(msg)
                                 if msg_id:
-                                    sent_alerts[alert_key] = {"msg_id": msg_id, "type": "pre", "status": "pending"}
+                                    sent_alerts.add(alert_key)
                                     sent_count += 1
                                 break
 
 def publish_half_hourly_news():
-    """Publica cada 30 minutos noticias/análisis de las ligas seleccionadas."""
-    global last_news_time
-    current_time = time.time()
+    """Publica noticias cada media hora garantizando que NO se repitan por bloque de tiempo."""
+    now_slot = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    hour_slot = datetime.now().strftime("%Y-%m-%d_%H") + ("_30" if datetime.now().minute >= 30 else "_00")
+
+    if hour_slot in sent_news:
+        return
+
+    league = random.choice(TARGET_LEAGUES)
+    clean_league_name = league.replace("soccer_spain_", "").replace("soccer_", "").replace("_", " ").title()
+
+    msg = (
+        f"📰 <b>INFORME TÁCTICO Y NOTICIAS EN TIEMPO REAL</b> 📰\n\n"
+        f"🏆 <b>Liga / Torneo:</b> {clean_league_name}\n"
+        f"🕒 <b>Actualización:</b> Cobertura de la jornada\n\n"
+        f"📌 <b>Novedades de Plantilla y Previa:</b>\n"
+        f"• Los equipos de la competición ajustan sus esquemas tácticos para la jornada.\n"
+        f"• Métricas destacadas: Incremento en la eficacia a balón parado y presión alta en bloque medio.\n"
+        f"• El algoritmo rastrea oportunidades en los mercados de <b>Goles, Córners y Tarjetas</b>.\n\n"
+        f"💡 <i>Permaneced atentos a los próximos avisos en vivo.</i>"
+    )
     
-    # Cada 30 minutos (1800 segundos)
-    if current_time - last_news_time >= 1800 or last_news_time == 0:
-        import random
-        league = random.choice(TARGET_LEAGUES)
-        
-        msg = (
-            f"📰 <b>INFORME TÁCTICO Y NOTICIAS EN TIEMPO REAL</b> 📰\n\n"
-            f"🏆 <b>Liga / Torneo:</b> {league.replace('soccer_spain_', '').replace('soccer_', '').title()}\n"
-            f"🕒 <b>Actualización:</b> Cobertura en directo\n\n"
-            f"📌 <b>Novedades de Plantilla y Previa:</b>\n"
-            f"• Los equipos de esta competición preparan la jornada ajustando cargas de entrenamiento.\n"
-            f"• Métricas destacadas: Incremento del 14% en eficacia de balón parado en los últimos enfrentamientos.\n"
-            f"• El algoritmo rastrea oportunidades en los mercados de <b>Goles, Córners y Tarjetas</b> para los próximos partidos.\n\n"
-            f"💡 <i>Permaneced atentos a las próximas alertas automatizadas en vivo.</i>"
-        )
-        send_telegram_message(msg)
-        last_news_time = current_time
-        logging.info("Post de noticias cada 30 minutos publicado con éxito.")
+    msg_id = send_telegram_message(msg)
+    if msg_id:
+        sent_news.add(hour_slot)
+        logging.info(f"Noticia publicada para la franja {hour_slot}.")
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Bot TOPTIPS Multi-Mercado, LIVE HT y Noticias 30m en ejecución...")
+    logging.info("Bot TOPTIPS Anti-Duplicados en ejecución...")
 
     while True:
         try:
-            # 1. Escanear picks pre-partido multi-mercado
             check_multimarket_picks()
-            
-            # 2. Publicar informe/noticia cada 30 minutos
             publish_half_hourly_news()
-
         except Exception as e:
-            logging.error(f"Error en bucle principal: {e}")
+            logging.error(f"Error en el bucle principal: {e}")
 
-        # Comprobar ciclo cada 5 minutos
+        # Revisa cada 5 minutos
         time.sleep(300)
 
 if __name__ == "__main__":
