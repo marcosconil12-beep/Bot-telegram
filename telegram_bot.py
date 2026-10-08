@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import logging
 import threading
 import requests
@@ -13,18 +14,36 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
+DB_FILE = "pending_bets.json"
+
 sent_alerts = set()
 sent_odds_alerts = set()
 
-# Diccionario para rastrear partidos pendientes de resultado
-pending_bets = {}
+# Funciones para persistencia de datos (evita perder los picks al reiniciar)
+def load_pending_bets():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            logging.error(f"Error cargando base de datos: {e}")
+    return {}
+
+def save_pending_bets(data):
+    try:
+        with open(DB_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logging.error(f"Error guardando base de datos: {e}")
+
+pending_bets = load_pending_bets()
 
 # Servidor HTTP para mantener Render activo
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot activo con sistema Live + Pre-match 24/7")
+        self.wfile.write(b"Bot TOPTIPS activo 24/7")
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -41,8 +60,7 @@ def send_telegram_message(text, reply_to_message_id=None):
     
     payload = {
         "chat_id": clean_chat_id,
-        "text": text,
-        "parse_mode": "Markdown"
+        "text": text
     }
     
     if reply_to_message_id:
@@ -66,32 +84,32 @@ def generar_argumentacion(equipo, rival, cuota, casa):
     if cuota >= 2.30:
         perfil = "Cuota Alta / Apuesta de Valor Prometedora"
         razon = (
-            f"El mercado asigna una probabilidad del {prob_implicita}% a la victoria de *{equipo}*, "
-            f"lo que presenta un desajuste claro frente a las métricas recientes del rival (*{rival}*). "
+            f"El mercado asigna una probabilidad del {prob_implicita}% a la victoria de {equipo}, "
+            f"lo que presenta un desajuste claro frente a las métricas recientes del rival ({rival}). "
             f"Existe un valor sustancial en entrar con esta cuota de {cuota:.2f}€ en {casa}."
         )
     elif cuota >= 2.00:
         perfil = "Cuota Par / Excelente Relación Riesgo-Beneficio"
         razon = (
             f"Con una cuota superior al par ({cuota:.2f}€), la cuota ofrece una rentabilidad del 100%+ sobre el capital invertido. "
-            f"La probabilidad implícita del {prob_implicita}% está infravalorada respecto a la dinámica ofensiva de *{equipo}*."
+            f"La probabilidad implícita del {prob_implicita}% está infravalorada respecto a la dinámica ofensiva de {equipo}."
         )
     else:
         perfil = "Favorito con Cuota de Valor Estándar"
         razon = (
-            f"Con un {prob_implicita}% de probabilidad implícita estimada por *{casa}*, "
-            f"*{equipo}* llega con solidez para imponerse ante *{rival}*. "
+            f"Con un {prob_implicita}% de probabilidad implícita estimada por {casa}, "
+            f"{equipo} llega con solidez para imponerse ante {rival}. "
             f"La cuota de {cuota:.2f}€ supera el umbral de seguridad mínimo (1.80€) con margen de beneficio."
         )
 
     return (
-        f"📊 *Análisis Técnico:*\n"
-        f"• *Perfil:* {perfil}\n"
-        f"• *Probabilidad Implicita:* {prob_implicita}%\n\n"
-        f"💡 *Justificación del Pick:*\n{razon}"
+        f"📊 Análisis Técnico:\n"
+        f"• Perfil: {perfil}\n"
+        f"• Probabilidad Implicita: {prob_implicita}%\n\n"
+        f"💡 Justificación del Pick:\n{razon}"
     )
 
-# 1. ALERTAS EN DIRECTO GLOBAL (The Odds API)
+# 1. ALERTAS EN DIRECTO GLOBAL
 def check_live_alerts():
     if not ODDS_API_KEY:
         return
@@ -112,7 +130,6 @@ def check_live_alerts():
         if event_id in sent_alerts:
             continue
 
-        # Verificar si el partido está en juego (no finalizado y con marcadores activos)
         completed = event.get("completed", False)
         scores = event.get("scores")
 
@@ -131,14 +148,13 @@ def check_live_alerts():
 
             total_goals = home_score + away_score
 
-            # Filtro Live: Partidos trabados o empatados con pocos goles (oportunidad de valor)
             if total_goals <= 1:
                 msg = (
-                    f"🚨 *ALERTA EN DIRECTO (GLOBAL)* 🚨\n\n"
-                    f"🏆 *Competición:* {sport_title}\n"
-                    f"⚔️ *Encuentro:* {home_team} vs {away_team}\n"
-                    f"📊 *Marcador Actual:* {home_score} - {away_score}\n\n"
-                    f"🔥 *Análisis Live:* Partido en curso con bajo registro de goles ({total_goals} goles). "
+                    f"🚨 ALERTA EN DIRECTO (GLOBAL) 🚨\n\n"
+                    f"🏆 Competición: {sport_title}\n"
+                    f"⚔️ Encuentro: {home_team} vs {away_team}\n"
+                    f"📊 Marcador Actual: {home_score} - {away_score}\n\n"
+                    f"🔥 Análisis Live: Partido en curso con bajo registro de goles ({total_goals} goles). "
                     f"Oportunidad detectada para monitorear líneas de Over / Gol en directo."
                 )
                 send_telegram_message(msg)
@@ -162,7 +178,7 @@ def check_value_bets_with_odds():
 
     for event in events:
         event_id = event.get("id")
-        if event_id in sent_odds_alerts:
+        if event_id in sent_odds_alerts or event_id in pending_bets:
             continue
 
         home_team = event.get("home_team")
@@ -207,14 +223,14 @@ def check_value_bets_with_odds():
             arg_texto = generar_argumentacion(target_team, target_rival, target_price, bookie_name)
             
             msg = (
-                f"🎯 *PRONÓSTICO DE VALOR (CUOTA >= 1.80€)* 🎯\n\n"
-                f"🏆 *Competición:* {sport_title}\n"
-                f"⚔️ *Encuentro:* {home_team} vs {away_team}\n\n"
-                f"📌 *Pronóstico:* Victoria de *{target_team}*\n"
-                f"💰 *Cuota Real:* *{target_price:.2f}€*\n"
-                f"🏦 *Disponible en:* {bookie_name}\n\n"
+                f"🎯 PRONÓSTICO DE VALOR (CUOTA >= 1.80€) 🎯\n\n"
+                f"🏆 Competición: {sport_title}\n"
+                f"⚔️ Encuentro: {home_team} vs {away_team}\n\n"
+                f"📌 Pronóstico: Victoria de {target_team}\n"
+                f"💰 Cuota Real: {target_price:.2f}€\n"
+                f"🏦 Disponible en: {bookie_name}\n\n"
                 f"{arg_texto}\n\n"
-                f"⚠️ *Gestión de Stake:* Recomendado Stake 1 (1%-2% del bankroll)."
+                f"⚠️ Gestión de Stake: Recomendado Stake 1 (1%-2% del bankroll)."
             )
             
             msg_id = send_telegram_message(msg)
@@ -228,10 +244,12 @@ def check_value_bets_with_odds():
                     "price": target_price,
                     "message_id": msg_id
                 }
+                save_pending_bets(pending_bets)
             break
 
 # 3. VERIFICAR RESULTADOS Y PUBLICAR ACIERTOS / FALLOS
 def check_completed_results():
+    global pending_bets
     if not ODDS_API_KEY or not pending_bets:
         return
 
@@ -279,31 +297,33 @@ def check_completed_results():
             if winner == target_team:
                 ganancia = round((price - 1) * 100, 1)
                 result_msg = (
-                    f"✅ *PRONÓSTICO ACERTADO (GREEN)* 🟢\n\n"
-                    f"⚔️ *Partido:* {bet_info['home_team']} {home_score} - {away_score} {bet_info['away_team']}\n"
-                    f"🎯 *Selección Ganadora:* Victoria de *{target_team}*\n"
-                    f"💰 *Cuota Cobrada:* *{price:.2f}€*\n"
-                    f"📈 *Rentabilidad:* +{ganancia}% de beneficio"
+                    f"✅ PRONÓSTICO ACERTADO (GREEN) 🟢\n\n"
+                    f"⚔️ Partido: {bet_info['home_team']} {home_score} - {away_score} {bet_info['away_team']}\n"
+                    f"🎯 Selección Ganadora: Victoria de {target_team}\n"
+                    f"💰 Cuota Cobrada: {price:.2f}€\n"
+                    f"📈 Rentabilidad: +{ganancia}% de beneficio"
                 )
             else:
                 result_msg = (
-                    f"❌ *PRONÓSTICO NO ACERTADO (RED)* 🔴\n\n"
-                    f"⚔️ *Resultado Final:* {bet_info['home_team']} {home_score} - {away_score} {bet_info['away_team']}\n"
-                    f"📌 *Apuesta realizada:* Victoria de *{target_team}*\n"
-                    f"📊 *Ganador real:* {winner}"
+                    f"❌ PRONÓSTICO NO ACERTADO (RED) 🔴\n\n"
+                    f"⚔️ Resultado Final: {bet_info['home_team']} {home_score} - {away_score} {bet_info['away_team']}\n"
+                    f"📌 Apuesta realizada: Victoria de {target_team}\n"
+                    f"📊 Ganador real: {winner}"
                 )
 
             send_telegram_message(result_msg, reply_to_message_id=msg_id)
             completed_ids.append(event_id)
 
-    for eid in completed_ids:
-        del pending_bets[eid]
+    if completed_ids:
+        for eid in completed_ids:
+            del pending_bets[eid]
+        save_pending_bets(pending_bets)
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Bot en marcha con módulo Live Global...")
+    logging.info("Bot en marcha con persistencia de base de datos activa...")
     
-    init_msg = "🤖 *Bot TOPTIPS Actualizado*\n\n✅ Módulo Live Global habilitado.\n✅ Verificación de aciertos (GREEN/RED) activada."
+    init_msg = "🤖 Bot TOPTIPS Reorganizado\n\n✅ Guardado persistente de datos activado.\n✅ Inmunidad ante reinicios de Render."
     send_telegram_message(init_msg)
 
     while True:
