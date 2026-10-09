@@ -20,6 +20,7 @@ published_picks = set()
 
 def send_telegram_photo(photo_path, caption):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
+        logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID")
         return None
     chat_id_clean = str(CHAT_ID).strip().replace('"', '').replace("'", "")
     token_clean = str(TELEGRAM_BOT_TOKEN).strip().replace('"', '').replace("'", "")
@@ -27,6 +28,7 @@ def send_telegram_photo(photo_path, caption):
     try:
         with open(photo_path, 'rb') as photo:
             res = requests.post(url, data={"chat_id": chat_id_clean, "caption": caption, "parse_mode": "HTML"}, files={"photo": photo}, timeout=15)
+            logging.info(f"Respuesta Telegram SendPhoto: {res.text}")
             return res.json().get("ok")
     except Exception as e:
         logging.error(f"Error enviando foto: {e}")
@@ -72,63 +74,24 @@ def run_http_server():
         logging.error(f"Error HTTP: {e}")
 
 def fetch_global_matches():
-    """Obtiene partidos de la API o de la macro-base de datos mundial de categorías y divisiones."""
-    events = []
-    if ODDS_API_KEY:
-        url = f"https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h"
-        try:
-            res = requests.get(url, timeout=10)
-            if res.status_code == 200:
-                events = res.json()
-        except Exception as e:
-            logging.error(f"Error API: {e}")
-            
-    if events:
-        valid_events = []
-        for ev in events:
-            home = ev.get("home_team")
-            away = ev.get("away_team")
-            league = ev.get("sport_title", "Fútbol Internacional")
-            if home and away:
-                odds = 2.00
-                if ev.get("bookmakers") and len(ev["bookmakers"]) > 0:
-                    mkts = ev["bookmakers"][0].get("markets", [])
-                    if mkts and len(mkts[0].get("outcomes", [])) > 0:
-                        odds = mkts[0]["outcomes"][0].get("price", 2.00)
-                valid_events.append((home, away, league, odds))
-        if valid_events:
-            return random.choice(valid_events)
-
-    # Macro base de datos mundial: Primera, Segunda división y ligas de todo el planeta
     global_database = [
-        # España (Primera y Segunda / Hypermotion)
         ("Real Zaragoza", "Eibar", "La Liga Hypermotion (2ª ESP)", 2.05),
         ("Sporting de Gijón", "Racing de Santander", "La Liga Hypermotion (2ª ESP)", 1.95),
         ("Mirandés", "Albacete", "La Liga Hypermotion (2ª ESP)", 2.15),
         ("Elche", "Tenerife", "La Liga Hypermotion (2ª ESP)", 1.85),
         ("Real Madrid", "Villarreal", "La Liga EA Sports", 1.75),
-        
-        # Inglaterra (Premier y Championship)
         ("Leeds United", "Burnley", "Championship (2ª ENG)", 1.90),
         ("West Bromwich", "Coventry City", "Championship (2ª ENG)", 2.00),
         ("Sunderland", "Sheffield United", "Championship (2ª ENG)", 2.10),
         ("Arsenal", "Chelsea", "Premier League", 1.80),
-        
-        # Italia (Serie A y Serie B)
         ("Palermo", "Sassuolo", "Serie B (2ª ITA)", 2.05),
         ("Sampdoria", "Bari", "Serie B (2ª ITA)", 1.95),
         ("Inter de Milán", "Juventus", "Serie A", 1.90),
-        
-        # Alemania (Bundesliga y 2. Bundesliga)
         ("Hamburgo", "Hertha BSC", "2. Bundesliga (GER)", 1.85),
         ("Schalke 04", "Hannover 96", "2. Bundesliga (GER)", 2.10),
         ("Bayern Múnich", "RB Leipzig", "Bundesliga", 1.65),
-        
-        # Francia (Ligue 1 y Ligue 2)
         ("Girondins de Burdeos", "Auxerre", "Ligue 2 (FRA)", 2.00),
         ("Lens", "Lyon", "Ligue 1", 2.15),
-        
-        # Latinoamérica y Resto del Mundo
         ("River Plate", "Boca Juniors", "Liga Profesional Argentina", 2.00),
         ("Flamengo", "Palmeiras", "Brasileirão Serie A", 1.95),
         ("Club América", "Tigres UANL", "Liga MX (México)", 1.90),
@@ -137,14 +100,13 @@ def fetch_global_matches():
         ("PSV Eindhoven", "Heerenveen", "Eredivisie (Países Bajos)", 1.70),
         ("Sporting CP", "Porto", "Liga Portugal", 1.85)
     ]
-    
     return random.choice(global_database)
 
 def publish_pick():
-    home, away, league, odds_val = global_match = fetch_global_matches()
+    home, away, league, odds_val = fetch_global_matches()
     match_title = f"{home} vs {away}"
     
-    today_str = datetime.now().strftime("%Y-%m-%d-%H")
+    today_str = datetime.now().strftime("%Y-%m-%d-%H-%M")
     pick_id = f"{match_title}_{today_str}"
     
     if pick_id in published_picks:
@@ -170,21 +132,22 @@ def publish_pick():
     img_path = create_scores24_card(match_title, league, chosen_pick, chosen_odds)
     if send_telegram_photo(img_path, caption):
         published_picks.add(pick_id)
-        logging.info(f"Pronóstico global publicado: {match_title} ({league})")
+        logging.info(f"Pronóstico global publicado con éxito: {match_title} ({league})")
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
     logging.info("Servicio Tipster Global Activo...")
 
+    # Publica el primer pronóstico a los 5 segundos de arrancar
     time.sleep(5)
     publish_pick()
 
     while True:
-        time.sleep(10800) # Publica un nuevo pronóstico de cualquier liga del mundo cada 3 horas
         try:
             publish_pick()
         except Exception as e:
             logging.error(f"Error en bucle: {e}")
+        time.sleep(10800) # Publica un nuevo pronóstico cada 3 horas
 
-if __name__ == "main__":
+if __name__ == "__main__":
     main()
