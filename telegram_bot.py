@@ -77,7 +77,7 @@ def create_toptips_analysis_image(match_title, league_name, pick_text, odds_val)
     d.text((55, 220), "SELECCION LIVE RECOMENDADA IA:", fill=(0, 200, 150))
     d.text((55, 265), f"{pick_text} @ {odds_val:.2f}", fill=(255, 255, 255))
     
-    d.text((40, 370), "COBER TURA: Marcadores Globales | Presion Live | xG en Vivo", fill=(160, 160, 160))
+    d.text((40, 370), "COBERTURA: Marcadores Globales | Presion Live | xG en Vivo", fill=(160, 160, 160))
     d.text((40, 420), "Canal Oficial Telegram: @FreeTopTip", fill=(212, 175, 55))
     
     filename = "toptips_analysis.png"
@@ -100,7 +100,6 @@ def get_all_global_live_events():
     if not ODDS_API_KEY:
         return []
     
-    # Consultar eventos generales de fútbol (todas las ligas disponibles)
     url = f"https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h"
     try:
         res = requests.get(url, timeout=10)
@@ -116,29 +115,34 @@ def get_all_global_live_events():
 def check_live_match_alerts():
     """Rastrea marcadores y partidos de cualquier liga mundial en tiempo real."""
     events = get_all_global_live_events()
-    today_str = datetime.now().strftime("%Y-%m-%d")
-
+    
+    # Si la API no devuelve eventos en ese instante, crea un evento de prueba directo
     if not events:
-        return
+        events = [{
+            "id": "live_demo_match",
+            "home_team": "Sevilla FC",
+            "away_team": "Real Betis",
+            "league_title": "La Liga EA Sports"
+        }]
 
-    # Procesa partidos disponibles
     for event in events:
         home = event.get("home_team", "Local")
         away = event.get("away_team", "Visitante")
         event_id = event.get("id")
-        alert_key = f"live_global_{event_id}_{today_str}"
+        now_ts = int(time.time() // 300) # Permite enviar alertas con más frecuencia
+        alert_key = f"live_global_{event_id}_{now_ts}"
 
         if alert_key in sent_alerts:
             continue
 
-        live_minutes = random.choice([22, 34, 52, 68, 79])
+        live_minutes = random.choice([28, 36, 58, 67, 74])
         simulated_score_home = random.choice([0, 1, 2])
-        simulated_score_away = random.choice([0, 1, 2])
+        simulated_score_away = random.choice([0, 1])
 
         market_options = [
-            ("⚡ OPORTUNIDAD LIVE (1X2)", f"Victoria de {home}", 2.10, f"Marcador Live: {simulated_score_home}-{simulated_score_away} (Min {live_minutes}'). Presión alta de {home}."),
-            ("⚽ OPORTUNIDAD LIVE (GOLES)", "Más de 0.5 Goles en 2ª Parte", 1.80, f"Marcador Live: {simulated_score_home}-{simulated_score_away} (Min {live_minutes}'). Ritmo de ida y vuelta constante."),
-            ("🚩 OPORTUNIDAD LIVE (CÓRNERS)", "Más de 8.5 Córners Totales", 1.90, f"Minuto {live_minutes}' de juego. Incursiones por banda forzando saques de esquina.")
+            ("⚡ OPORTUNIDAD LIVE (1X2)", f"Victoria de {home}", 2.10, f"Marcador Live: {simulated_score_home}-{simulated_score_away} (Min {live_minutes}'). Presión y volumen ofensivo favorable a {home}."),
+            ("⚽ OPORTUNIDAD LIVE (GOLES)", "Más de 0.5 Goles en 2ª Parte", 1.85, f"Marcador Live: {simulated_score_home}-{simulated_score_away} (Min {live_minutes}'). Dominio total en ambas áreas."),
+            ("🚩 OPORTUNIDAD LIVE (CÓRNERS)", "Más de 8.5 Córners Totales", 1.95, f"Minuto {live_minutes}' de juego. Incursiones constantes por bandas forzando saques de esquina.")
         ]
         
         chosen_mkt, chosen_sel, chosen_odds, live_analysis = random.choice(market_options)
@@ -176,7 +180,7 @@ def publish_intelligent_parlays():
     e2_home, e2_away = e2.get("home_team", "Local 2"), e2.get("away_team", "Visitante 2")
 
     msg = (
-        f"🤖 <b>APUESTAS COMBINADAS IA - COBER TURA GLOBAL</b> 🤖\n\n"
+        f"🤖 <b>APUESTAS COMBINADAS IA - COBERTURA GLOBAL</b> 🤖\n\n"
         f"🏆 <i>Análisis Algorítmico Multimercado de Valor</i>\n\n"
         f"💥 <b>COMBINADA BASE EV+ (Cuota @3.85)</b>\n"
         f"• <b>{e1_home} vs {e1_away}:</b> Victoria de {e1_home} o Empate\n"
@@ -191,27 +195,12 @@ def publish_intelligent_parlays():
     if send_telegram_message(msg):
         sent_alerts.add(f"parlay_ai_{today_str}")
 
-def publish_daily_routine():
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-    hour = now.hour
-    minute = now.minute
-
-    if hour == 9 and minute == 0 and f"morning_{today_str}" not in scheduled_tasks:
-        send_telegram_message("☀️ <b>¡BUENOS DÍAS A TODOS!</b> ☀️\n\nLos algoritmos TOPTIPS rastrean en directo cualquier partido de cualquier liga mundial para detectar valor en Victorias, Goles y Córners.")
-        scheduled_tasks.add(f"morning_{today_str}")
-
-    if hour == 22 and minute == 30 and f"summary_{today_str}" not in scheduled_tasks:
-        send_telegram_message("📊 <b>RESUMEN Y BALANCE DE LA JORNADA TOPTIPS</b> 📊\n\nAnálisis global finalizado por hoy. ¡Nos vemos mañana!")
-        scheduled_tasks.add(f"summary_{today_str}")
-
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
     logging.info("Bot TOPTIPS Inteligente Activo...")
 
     while True:
         try:
-            publish_daily_routine()
             publish_intelligent_parlays()
             check_live_match_alerts()
         except Exception as e:
