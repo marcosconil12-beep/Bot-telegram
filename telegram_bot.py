@@ -128,7 +128,6 @@ def publish_intelligent_parlays():
     if len(events) < 2:
         return
 
-    # Tomamos partidos reales obtenidos de la API
     e1, e2 = events[0], events[1]
     e1_home, e1_away = e1.get("home_team", "Local 1"), e1.get("away_team", "Visitante 1")
     e2_home, e2_away = e2.get("home_team", "Local 2"), e2.get("away_team", "Visitante 2")
@@ -211,4 +210,8 @@ def main():
             publish_intelligent_parlays()
             check_live_and_prematch_picks()
         except Exception as e:
-            logging.error(f"Error en el bucle principal: {
+            logging.error(f"Error en el bucle principal: {e}")
+        time.sleep(120)
+
+if __name__ == "__main__":
+    main()
