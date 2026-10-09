@@ -18,14 +18,16 @@ ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 sent_alerts = set()
-scheduled_tasks = set()
 CSV_FILE = "registro_pronosticos.csv"
 
 def init_csv():
-    if not os.path.exists(CSV_FILE):
-        with open(CSV_FILE, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow(["Fecha", "Tipo", "Detalle", "Cuota", "Resultado", "Unidades"])
+    try:
+        if not os.path.exists(CSV_FILE):
+            with open(CSV_FILE, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                writer.writerow(["Fecha", "Tipo", "Detalle", "Cuota", "Resultado", "Unidades"])
+    except Exception as e:
+        logging.error(f"Error inicializando CSV: {e}")
 
 init_csv()
 
@@ -41,7 +43,6 @@ def send_telegram_message(text):
     payload = {"chat_id": chat_id_clean, "text": text, "parse_mode": "HTML"}
     try:
         res = requests.post(url, json=payload, timeout=10)
-        logging.info(f"Respuesta Telegram: {res.status_code} - {res.text}")
         return res.json().get("ok")
     except Exception as e:
         logging.error(f"Error al enviar mensaje: {e}")
@@ -93,7 +94,10 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
-    HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler).serve_forever()
+    try:
+        HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler).serve_forever()
+    except Exception as e:
+        logging.error(f"Error en servidor HTTP: {e}")
 
 def get_all_global_live_events():
     """Rastrea partidos de CUALQUIER liga en curso a nivel mundial."""
@@ -114,85 +118,55 @@ def get_all_global_live_events():
 
 def check_live_match_alerts():
     """Rastrea partidos REALES de cualquier liga mundial."""
-    events = get_all_global_live_events()
-    
-    # Si no hay eventos reales devueltos por la API en este instante, se omite hasta el siguiente ciclo
-    if not events:
-        return
-
-    today_str = datetime.now().strftime("%Y-%m-%d")
-
-    for event in events:
-        home = event.get("home_team", "Local")
-        away = event.get("away_team", "Visitante")
-        event_id = event.get("id")
-        alert_key = f"live_real_{event_id}_{today_str}"
-
-        if alert_key in sent_alerts:
-            continue
-
-        # Extraer cuotas de la API si están disponibles
-        odds_val = 2.00
-        if event.get("bookmakers") and len(event["bookmakers"]) > 0:
-            markets = event["bookmakers"][0].get("markets", [])
-            if markets and len(markets[0].get("outcomes", [])) > 0:
-                odds_val = markets[0]["outcomes"][0].get("price", 2.00)
-
-        market_options = [
-            ("⚡ OPORTUNIDAD LIVE (1X2)", f"Victoria de {home}", odds_val, f"Presión ofensiva y dominio de balón favorable a {home}."),
-            ("⚽ OPORTUNIDAD LIVE (GOLES)", "Más de 1.5 Goles Totales", 1.85, f"Ritmo de juego intenso proyectado para el choque entre {home} y {away}."),
-            ("🚩 OPORTUNIDAD LIVE (CÓRNERS)", "Más de 8.5 Córners Totales", 1.95, f"Ataque continuo por bandas entre {home} y {away}.")
-        ]
-        
-        chosen_mkt, chosen_sel, chosen_odds, live_analysis = random.choice(market_options)
-
-        caption_msg = (
-            f"🚨 <b>{chosen_mkt}</b> 🚨\n\n"
-            f"🏆 <b>Liga / Torneo:</b> {event.get('league_title', 'Internacional')}\n"
-            f"⚔️ <b>Partido Real:</b> {home} vs {away}\n"
-            f"⏱️ <b>Estado:</b> Partido en Vivo / Programado hoy\n\n"
-            f"📌 <b>Selección Recomendada:</b> {chosen_sel}\n"
-            f"📈 <b>Cuota Real:</b> {chosen_odds:.2f}€ | 🏦 <b>Casa:</b> Bet365\n\n"
-            f"📊 <b>ANÁLISIS EN VIVO:</b>\n"
-            f"• {live_analysis}\n\n"
-            f"⚠️ <b>Stake Sugerido:</b> Stake 1"
-        )
-
-        img_path = create_toptips_analysis_image(f"{home} vs {away}", event.get('league_title', 'Internacional'), chosen_sel, chosen_odds)
-        
-        if send_telegram_photo(img_path, caption_msg):
-            sent_alerts.add(alert_key)
+    try:
+        events = get_all_global_live_events()
+        if not events:
             return
 
-def publish_intelligent_parlays():
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-    if f"parlay_ai_{today_str}" in sent_alerts:
-        return
+        today_str = datetime.now().strftime("%Y-%m-%d")
 
-    events = get_all_global_live_events()
-    if len(events) < 2:
-        return
+        for event in events:
+            home = event.get("home_team", "Local")
+            away = event.get("away_team", "Visitante")
+            event_id = event.get("id")
+            alert_key = f"live_real_{event_id}_{today_str}"
 
-    e1, e2 = events[0], events[1]
-    e1_home, e1_away = e1.get("home_team", "Local 1"), e1.get("away_team", "Visitante 1")
-    e2_home, e2_away = e2.get("home_team", "Local 2"), e2.get("away_team", "Visitante 2")
+            if alert_key in sent_alerts:
+                continue
 
-    msg = (
-        f"🤖 <b>APUESTAS COMBINADAS IA - PARTIDOS REALES</b> 🤖\n\n"
-        f"🏆 <i>Análisis Algorítmico Multimercado de Valor</i>\n\n"
-        f"💥 <b>COMBINADA BASE EV+ (Cuota @3.85)</b>\n"
-        f"• <b>{e1_home} vs {e1_away}:</b> Victoria de {e1_home} o Empate\n"
-        f"• <b>{e2_home} vs {e2_away}:</b> Más de 1.5 Goles Totales\n"
-        f"📌 <b>Stake 2/5</b>\n\n"
-        f"🔥 <b>COMBINADA BOMBAGO LIVE (Cuota @12.50)</b>\n"
-        f"• <b>{e1_home} vs {e1_away}:</b> Ambos Equipos Anotan + Más de 8.5 Córners\n"
-        f"• <b>{e2_home} vs {e2_away}:</b> Victoria de {e2_home}\n"
-        f"📌 <b>Stake 0.5/5</b>\n\n"
-        f"💡 <i>Analizado y validado mediante filtros de valor globales en Bet365.</i>"
-    )
-    if send_telegram_message(msg):
-        sent_alerts.add(f"parlay_ai_{today_str}")
+            odds_val = 2.00
+            if event.get("bookmakers") and len(event["bookmakers"]) > 0:
+                markets = event["bookmakers"][0].get("markets", [])
+                if markets and len(markets[0].get("outcomes", [])) > 0:
+                    odds_val = markets[0]["outcomes"][0].get("price", 2.00)
+
+            market_options = [
+                ("⚡ OPORTUNIDAD LIVE (1X2)", f"Victoria de {home}", odds_val, f"Presión ofensiva y dominio de balón favorable a {home}."),
+                ("⚽ OPORTUNIDAD LIVE (GOLES)", "Más de 1.5 Goles Totales", 1.85, f"Ritmo de juego intenso proyectado para el choque entre {home} y {away}."),
+                ("🚩 OPORTUNIDAD LIVE (CÓRNERS)", "Más de 8.5 Córners Totales", 1.95, f"Ataque continuo por bandas entre {home} y {away}.")
+            ]
+            
+            chosen_mkt, chosen_sel, chosen_odds, live_analysis = random.choice(market_options)
+
+            caption_msg = (
+                f"🚨 <b>{chosen_mkt}</b> 🚨\n\n"
+                f"🏆 <b>Liga / Torneo:</b> {event.get('league_title', 'Internacional')}\n"
+                f"⚔️ <b>Partido Real:</b> {home} vs {away}\n"
+                f"⏱️ <b>Estado:</b> Partido en Vivo / Programado hoy\n\n"
+                f"📌 <b>Selección Recomendada:</b> {chosen_sel}\n"
+                f"📈 <b>Cuota Real:</b> {chosen_odds:.2f}€ | 🏦 <b>Casa:</b> Bet365\n\n"
+                f"📊 <b>ANÁLISIS EN VIVO:</b>\n"
+                f"• {live_analysis}\n\n"
+                f"⚠️ <b>Stake Sugerido:</b> Stake 1"
+            )
+
+            img_path = create_toptips_analysis_image(f"{home} vs {away}", event.get('league_title', 'Internacional'), chosen_sel, chosen_odds)
+            
+            if send_telegram_photo(img_path, caption_msg):
+                sent_alerts.add(alert_key)
+                return
+    except Exception as e:
+        logging.error(f"Error en check_live_match_alerts: {e}")
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
@@ -200,7 +174,6 @@ def main():
 
     while True:
         try:
-            publish_intelligent_parlays()
             check_live_match_alerts()
         except Exception as e:
             logging.error(f"Error en el bucle principal: {e}")
