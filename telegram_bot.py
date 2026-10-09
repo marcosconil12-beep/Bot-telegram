@@ -28,7 +28,6 @@ def send_telegram_photo(photo_path, caption):
     try:
         with open(photo_path, 'rb') as photo:
             res = requests.post(url, data={"chat_id": chat_id_clean, "caption": caption, "parse_mode": "HTML"}, files={"photo": photo}, timeout=15)
-            logging.info(f"Respuesta Telegram SendPhoto: {res.text}")
             return res.json().get("ok")
     except Exception as e:
         logging.error(f"Error enviando foto: {e}")
@@ -41,10 +40,10 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
     
     d.rectangle([20, 20, 980, 530], outline=(0, 212, 170), width=4)
     d.rectangle([20, 20, 980, 95], fill=(20, 40, 65))
-    d.text((40, 45), "⚡ TOPTIPS GLOBAL ANALYTICS", fill=(0, 212, 170))
+    d.text((40, 45), "⚡ TOPTIPS LIVE & ANALYTICS", fill=(0, 212, 170))
     d.text((580, 45), league_name.upper()[:25], fill=(200, 200, 200))
     
-    d.text((40, 140), "ENCUENTRO EN CURSO / JORNADA:", fill=(150, 160, 180))
+    d.text((40, 140), "ENCUENTRO EN DIRECTO:", fill=(150, 160, 180))
     d.text((40, 185), match_title, fill=(255, 255, 255))
     
     d.rectangle([40, 260, 960, 410], fill=(24, 43, 73), outline=(255, 215, 0), width=2)
@@ -52,7 +51,7 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
     d.text((70, 335), f"{pick_text}", fill=(255, 255, 255))
     d.text((750, 335), f"@{odds_val:.2f}", fill=(0, 212, 170))
     
-    d.text((40, 460), "📊 Cuotas verificadas | Cobertura Mundial 24/7", fill=(150, 160, 180))
+    d.text((40, 460), "📊 Cuotas verificadas en tiempo real", fill=(150, 160, 180))
     d.text((40, 495), "Canal Oficial: @FreeTopTip", fill=(255, 215, 0))
     
     filename = "scores24_card.png"
@@ -64,7 +63,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Global Activo".encode('utf-8'))
+        self.wfile.write("Bot API Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -73,40 +72,48 @@ def run_http_server():
     except Exception as e:
         logging.error(f"Error HTTP: {e}")
 
-def fetch_global_matches():
-    global_database = [
-        ("Real Zaragoza", "Eibar", "La Liga Hypermotion (2ª ESP)", 2.05),
-        ("Sporting de Gijón", "Racing de Santander", "La Liga Hypermotion (2ª ESP)", 1.95),
-        ("Mirandés", "Albacete", "La Liga Hypermotion (2ª ESP)", 2.15),
-        ("Elche", "Tenerife", "La Liga Hypermotion (2ª ESP)", 1.85),
-        ("Real Madrid", "Villarreal", "La Liga EA Sports", 1.75),
-        ("Leeds United", "Burnley", "Championship (2ª ENG)", 1.90),
-        ("West Bromwich", "Coventry City", "Championship (2ª ENG)", 2.00),
-        ("Sunderland", "Sheffield United", "Championship (2ª ENG)", 2.10),
-        ("Arsenal", "Chelsea", "Premier League", 1.80),
-        ("Palermo", "Sassuolo", "Serie B (2ª ITA)", 2.05),
-        ("Sampdoria", "Bari", "Serie B (2ª ITA)", 1.95),
-        ("Inter de Milán", "Juventus", "Serie A", 1.90),
-        ("Hamburgo", "Hertha BSC", "2. Bundesliga (GER)", 1.85),
-        ("Schalke 04", "Hannover 96", "2. Bundesliga (GER)", 2.10),
-        ("Bayern Múnich", "RB Leipzig", "Bundesliga", 1.65),
-        ("Girondins de Burdeos", "Auxerre", "Ligue 2 (FRA)", 2.00),
-        ("Lens", "Lyon", "Ligue 1", 2.15),
-        ("River Plate", "Boca Juniors", "Liga Profesional Argentina", 2.00),
-        ("Flamengo", "Palmeiras", "Brasileirão Serie A", 1.95),
-        ("Club América", "Tigres UANL", "Liga MX (México)", 1.90),
-        ("Al Nassr", "Al Hilal", "Saudi Pro League", 1.80),
-        ("Júbilo Iwata", "Tokyo Verdy", "J1 League (Japón)", 2.10),
-        ("PSV Eindhoven", "Heerenveen", "Eredivisie (Países Bajos)", 1.70),
-        ("Sporting CP", "Porto", "Liga Portugal", 1.85)
-    ]
-    return random.choice(global_database)
+def fetch_live_api_match():
+    """Obtiene únicamente partidos reales y actuales directamente desde la API oficial."""
+    if not ODDS_API_KEY:
+        logging.error("Falta la API Key de Odds API en las variables de entorno.")
+        return None
+        
+    url = f"https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h"
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            events = res.json()
+            if events:
+                event = random.choice(events)
+                home = event.get("home_team")
+                away = event.get("away_team")
+                league = event.get("sport_title", "Fútbol Internacional")
+                
+                odds_val = 2.00
+                if event.get("bookmakers") and len(event["bookmakers"]) > 0:
+                    markets = event["bookmakers"][0].get("markets", [])
+                    if markets and len(markets[0].get("outcomes", [])) > 0:
+                        odds_val = markets[0]["outcomes"][0].get("price", 2.00)
+                
+                if home and away:
+                    return home, away, league, odds_val
+        else:
+            logging.warning(f"La API respondió con código: {res.status_code}")
+    except Exception as e:
+        logging.error(f"Error consultando la API: {e}")
+        
+    return None
 
 def publish_pick():
-    home, away, league, odds_val = fetch_global_matches()
+    match_data = fetch_live_api_match()
+    if not match_data:
+        logging.info("Esperando nuevos partidos en directo desde la API...")
+        return
+
+    home, away, league, odds_val = match_data
     match_title = f"{home} vs {away}"
     
-    today_str = datetime.now().strftime("%Y-%m-%d-%H-%M")
+    today_str = datetime.now().strftime("%Y-%m-%d-%H")
     pick_id = f"{match_title}_{today_str}"
     
     if pick_id in published_picks:
@@ -120,7 +127,7 @@ def publish_pick():
     chosen_pick, chosen_odds, analysis = random.choice(markets)
 
     caption = (
-        f"⚽ <b>PRONÓSTICO OFICIAL GLOBAL</b> ⚽\n\n"
+        f"⚽ <b>PRONÓSTICO OFICIAL</b> ⚽\n\n"
         f"🏆 <b>Competición:</b> {league}\n"
         f"⚔️ <b>Encuentro:</b> {match_title}\n\n"
         f"🎯 <b>Selección:</b> <code>{chosen_pick}</code>\n"
@@ -132,13 +139,13 @@ def publish_pick():
     img_path = create_scores24_card(match_title, league, chosen_pick, chosen_odds)
     if send_telegram_photo(img_path, caption):
         published_picks.add(pick_id)
-        logging.info(f"Pronóstico global publicado con éxito: {match_title} ({league})")
+        logging.info(f"Pronóstico real publicado con éxito: {match_title} ({league})")
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster Global Activo...")
+    logging.info("Servicio Tipster 100% API Real Activo...")
 
-    # Publica el primer pronóstico a los 5 segundos de arrancar
+    # Intento de publicación inicial tras arrancar
     time.sleep(5)
     publish_pick()
 
@@ -147,7 +154,7 @@ def main():
             publish_pick()
         except Exception as e:
             logging.error(f"Error en bucle: {e}")
-        time.sleep(10800) # Publica un nuevo pronóstico cada 3 horas
+        time.sleep(7200) # Revisa y publica cada 2 horas
 
 if __name__ == "__main__":
     main()
