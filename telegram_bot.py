@@ -81,13 +81,18 @@ def publish_daily_routine():
     today_str = now.strftime("%Y-%m-%d")
     hour, minute = now.hour, now.minute
 
-    # Buenos días (09:00 AM)
-    if hour == 9 and f"morning_{today_str}" not in scheduled_tasks:
+    # Prueba / Envio especial de apertura (09:22 AM)
+    if hour == 9 and minute == 22 and f"special_{today_str}" not in scheduled_tasks:
+        send_telegram_message("☀️ <b>¡BUENOS DÍAS Y BIENVENIDOS A LA JORNADA DE HOY!</b> ☀️\n\nEl sistema ya está activo analizando cuotas y métricas avanzadas. En breve publicaremos las combinadas del día y el Pick Premium Stake 5.")
+        scheduled_tasks.add(f"special_{today_str}")
+
+    # Buenos días oficial (09:00 AM para los próximos días)
+    if hour == 9 and minute == 0 and f"morning_{today_str}" not in scheduled_tasks:
         send_telegram_message("☀️ <b>¡BUENOS DÍAS A TODOS!</b> ☀️\n\nArrancamos la jornada con nuestras Combinadas (Cuota 4, 10, 15 y 20) y el Pick Premium Stake 5.")
         scheduled_tasks.add(f"morning_{today_str}")
 
     # Venta Premium (13:00 PM)
-    if hour == 13 and f"premium_{today_str}" not in scheduled_tasks:
+    if hour == 13 and minute == 0 and f"premium_{today_str}" not in scheduled_tasks:
         img_path = create_premium_image("Encuentro Destacado del Día", "LaLiga / Premier League")
         caption = "🔒 <b>PICK PREMIUM STAKE 5 DISPONIBLE</b> 🔒\n\n💎 Confianza: Stake 5\n💰 Precio: 9,99€\n📩 Adquiérelo escribiendo a: @Mark122"
         send_telegram_photo(img_path, caption)
@@ -170,7 +175,7 @@ def main():
             check_multimarket_value_picks()
         except Exception as e:
             logging.error(f"Error: {e}")
-        time.sleep(600)
+        time.sleep(30)
 
 if __name__ == "__main__":
     main()
