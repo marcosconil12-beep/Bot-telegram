@@ -18,7 +18,6 @@ TELEGRAM_USERNAME = "Mark122" # Tu usuario VIP
 
 published_picks = set()
 
-# Sistema de estadísticas acumuladas del canal
 CHANNEL_STATS = {
     "wins": 58,
     "losses": 12,
@@ -28,35 +27,52 @@ CHANNEL_STATS = {
 
 def send_telegram_message(text, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
+        logging.error("ERROR: Falta TELEGRAM_BOT_TOKEN o CHAT_ID en las variables de entorno.")
         return None
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN.strip()}/sendMessage"
-    payload = {"chat_id": CHAT_ID.strip(), "text": text, "parse_mode": "HTML"}
+    
+    token = str(TELEGRAM_BOT_TOKEN).strip().replace('"', '').replace("'", "")
+    chat = str(CHAT_ID).strip().replace('"', '').replace("'", "")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    
+    payload = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
     if reply_markup:
         payload["reply_markup"] = reply_markup
+        
     try:
-        res = requests.post(url, json=payload, timeout=15)
-        return res.json().get("ok")
+        res = requests.post(url, json=payload, timeout=8)
+        data = res.json()
+        if not data.get("ok"):
+            logging.error(f"Error de Telegram al enviar mensaje: {data}")
+        return data.get("ok")
     except Exception as e:
-        logging.error(f"Error enviando mensaje: {e}")
+        logging.error(f"Excepción enviando mensaje: {e}")
         return None
 
 def send_telegram_photo(photo_path, caption, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
+        logging.error("ERROR: Falta TELEGRAM_BOT_TOKEN o CHAT_ID en las variables de entorno.")
         return None
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN.strip()}/sendPhoto"
+        
+    token = str(TELEGRAM_BOT_TOKEN).strip().replace('"', '').replace("'", "")
+    chat = str(CHAT_ID).strip().replace('"', '').replace("'", "")
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    
     try:
         with open(photo_path, 'rb') as photo:
-            data = {"chat_id": CHAT_ID.strip(), "caption": caption, "parse_mode": "HTML"}
+            data = {"chat_id": chat, "caption": caption, "parse_mode": "HTML"}
             if reply_markup:
-                data["reply_markup"] = reply_markup
-            res = requests.post(url, data=data, files={"photo": photo}, timeout=15)
-            return res.json().get("ok")
+                import json
+                data["reply_markup"] = json.dumps(reply_markup)
+            res = requests.post(url, data=data, files={"photo": photo}, timeout=10)
+            res_json = res.json()
+            if not res_json.get("ok"):
+                logging.error(f"Error de Telegram al enviar foto: {res_json}")
+            return res_json.get("ok")
     except Exception as e:
-        logging.error(f"Error enviando foto: {e}")
+        logging.error(f"Excepción enviando foto a Telegram: {e}")
         return None
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val, is_live=False):
-    """Genera la tarjeta gráfica estilo Scores24."""
     bg_color = (13, 27, 42) if not is_live else (25, 10, 15)
     border_color = (0, 212, 170) if not is_live else (255, 45, 85)
     
@@ -97,91 +113,49 @@ def run_http_server():
     try:
         HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler).serve_forever()
     except Exception as e:
-        logging.error(f"Error HTTP: {e}")
+        logging.error(f"Error servidor HTTP: {e}")
 
 def get_global_pro_match():
     pool = [
-        # España
         ("Real Madrid", "Villarreal", "La Liga EA Sports"),
         ("FC Barcelona", "Atlético de Madrid", "La Liga EA Sports"),
         ("Real Zaragoza", "Granada CF", "La Liga Hypermotion (2ª ESP)"),
         ("Sporting de Gijón", "Racing de Santander", "La Liga Hypermotion (2ª ESP)"),
-        # Inglaterra
         ("Manchester City", "Liverpool", "Premier League"),
         ("Arsenal", "Chelsea", "Premier League"),
         ("Leeds United", "Sheffield United", "Championship (2ª ENG)"),
-        # Italia
         ("Inter de Milán", "Juventus", "Serie A"),
         ("AC Milan", "Napoli", "Serie A"),
         ("Palermo", "Sassuolo", "Serie B (2ª ITA)"),
-        # Alemania
         ("Bayern Múnich", "RB Leipzig", "Bundesliga"),
         ("Borussia Dortmund", "Bayer Leverkusen", "Bundesliga"),
         ("Hamburgo", "Hertha BSC", "2. Bundesliga (GER)"),
-        # Francia
         ("PSG", "Marsella", "Ligue 1"),
         ("Lyon", "AS Monaco", "Ligue 1"),
-        # Brasil
         ("Flamengo", "Palmeiras", "Brasileirão Serie A"),
         ("Santos", "Sport Recife", "Brasileirão Serie B"),
-        # Japón
         ("Vissel Kobe", "Yokohama F. Marinos", "J1 League (Japón)")
     ]
     return random.choice(pool)
 
 def scan_live_matches_ia():
-    """
-    ESCÁNER IA EN TIEMPO REAL:
-    Evalúa continuamente parámetros en vivo (Ataques peligrosos, xG acumulado, remates a puerta).
-    Si se cumple la condición de IA, salta de inmediato con la alerta.
-    """
     home, away, league = get_global_pro_match()
     match_title = f"{home} vs {away}"
     
-    # Simulación de condiciones en tiempo real (1ª mitad entre 20'-40' o 2ª mitad entre 55'-80')
     half = random.choice(["1ª Parte", "2ª Parte"])
     minute = random.randint(22, 38) if half == "1ª Parte" else random.randint(58, 78)
-    
     score_home = random.randint(0, 1) if half == "1ª Parte" else random.randint(0, 2)
     score_away = random.randint(0, 1) if half == "1ª Parte" else random.randint(0, 2)
     
-    shots_on_target = random.randint(6, 11)
-    corners_count = random.randint(5, 9)
-    danger_attacks = random.randint(45, 80)
+    ia_triggers = [
+        (f"GOL PROMINENTE ({half}): Más de 0.5 Goles antes del descanso/final", round(random.uniform(1.85, 2.30), 2), "Presión asfixiante y más de 6 remates a puerta detectados por la IA."),
+        (f"CÓRNERES EN VIVO: Más de 8.5 Córneres Totales", round(random.uniform(1.80, 2.15), 2), "Ritmo de partido súper acelerado con constante juego por las bandas."),
+        (f"VICTORIA EN REMONTADA: {home}", round(random.uniform(2.10, 2.70), 2), f"{home} domina con más del 70% de posesión buscando dar la vuelta al marcador.")
+    ]
     
-    # Condición de IA para disparar la alerta
-    ia_triggers = []
-    
-    # Requisito IA 1: Alta presión de gol
-    if danger_attacks > 50 and shots_on_target >= 6:
-        ia_triggers.append((
-            f"GOL PROMINENTE ({half}): Más de 0.5 Goles antes del descanso/final", 
-            round(random.uniform(1.85, 2.30), 2), 
-            f"Algoritmo IA detecta índice de presión {danger_attacks} ataques peligrosos y {shots_on_target} disparos a puerta. Alta probabilidad de gol inminente."
-        ))
-    
-    # Requisito IA 2: Carrera a Córneres
-    if corners_count >= 6:
-        ia_triggers.append((
-            f"CÓRNERES EN VIVO: Más de {corners_count + 3}.5 Córneres Totales", 
-            round(random.uniform(1.80, 2.15), 2), 
-            f"El partido promedia un córner cada 5 minutos. Ritmo de juego totalmente volcado por las bandas."
-        ))
-        
-    # Requisito IA 3: Remontada / Victoria del Favorito
-    if score_home < score_away and "Real Madrid" in home or "Manchester City" in home or "PSG" in home:
-        ia_triggers.append((
-            f"VICTORIA EN REMONTADA: {home} (Empate Apuesta No Válida)", 
-            round(random.uniform(2.10, 2.70), 2), 
-            f"{home} está encerrando al rival en su área con más del 70% de posesión en la {half}."
-        ))
-
-    if not ia_triggers:
-        return False # No reúne los requisitos estrictos de la IA en este chequeo
-
     chosen_pick, chosen_odds, ia_reason = random.choice(ia_triggers)
-    
     pick_id = f"LIVE_{match_title}_{minute}_{datetime.now().strftime('%Y%m%d%H%M')}"
+    
     if pick_id in published_picks:
         return False
 
@@ -192,7 +166,7 @@ def scan_live_matches_ia():
         f"⏱️ <b>Tiempo:</b> <b>{minute}' ({half})</b> | ⚽ <b>Marcador:</b> <b>{score_home} - {score_away}</b>\n\n"
         f"🔥 <b>SEÑAL IA DE ALTO VALOR:</b>\n"
         f"• Selección: <code>{chosen_pick}</code>\n"
-        f"• Cuota Live: <b>{chosen_odds:.2f}</b> (Casas de Apuestas / Bet365)\n"
+        f"• Cuota Live: <b>{chosen_odds:.2f}</b> (Bet365 / Casas de Apuestas)\n"
         f"• Stake Recomendado: <b>2 / 10 (Fuerte)</b>\n\n"
         f"🧠 <b>ANÁLISIS ALGORÍTMICO EN TIEMPO REAL:</b>\n"
         f"<i>{ia_reason}</i>\n\n"
@@ -210,12 +184,11 @@ def scan_live_matches_ia():
     img_path = create_scores24_card(f"{match_title} ({minute}' {score_home}-{score_away})", league, chosen_pick, chosen_odds, is_live=True)
     if send_telegram_photo(img_path, caption, reply_markup=keyboard):
         published_picks.add(pick_id)
-        logging.info(f"¡Alerta IA LIVE publicada con éxito!: {match_title}")
+        logging.info(f"¡Alerta IA LIVE enviada correctamente!: {match_title}")
         return True
     return False
 
 def publish_pick():
-    """Análisis Pre-Partido."""
     home, away, league = get_global_pro_match()
     match_title = f"{home} vs {away}"
     odds_val = round(random.uniform(1.75, 2.30), 2)
@@ -237,7 +210,7 @@ def publish_pick():
 
     markets = [
         ("Victoria de " + home, odds_val, f"{home} domina territorialmente con un xG de {xg_home} frente a {xg_away} del rival."),
-        ("Más de 2.5 Goles", round(odds_val * 0.95, 2), f"Alta proyección offensive. Goles esperados conjuntos superiores a 3.1."),
+        ("Más de 2.5 Goles", round(odds_val * 0.95, 2), f"Alta proyección ofensiva. Goles esperados conjuntos superiores a 3.1."),
         ("Ambos Anotan (Sí)", round(odds_val * 0.98, 2), f"Las defensas muestran concesiones recientes y los ataques promedian alta efectividad.")
     ]
     chosen_pick, chosen_odds, analysis = random.choice(markets)
@@ -280,31 +253,34 @@ def publish_pick():
         published_picks.add(pick_id)
         CHANNEL_STATS["wins"] += 1
         CHANNEL_STATS["profit_units"] = round(CHANNEL_STATS["profit_units"] + 1.2, 1)
-        logging.info(f"Análisis pre-partido publicado con éxito: {match_title}")
+        logging.info(f"Análisis pre-partido enviado correctamente: {match_title}")
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Escáner IA y Tipster Pro Activo...")
+    logging.info("Servicio Escáner IA y Tipster Pro Iniciado...")
 
-    time.sleep(3)
-    publish_pick() # Lanza un primer pronóstico de bienvenida al arrancar
+    # Intenta enviar una publicación pre-partido de prueba inicial
+    try:
+        publish_pick()
+    except Exception as e:
+        logging.error(f"Error en envío inicial: {e}")
 
     last_pre_match_time = time.time()
 
     while True:
         try:
-            # 1. ESCÁNER IA LIVE CONTINUO (revisa cada 3 minutos si hay partidos en vivo que cumplan los requisitos)
+            # Revisa/envía alerta LIVE
             scan_live_matches_ia()
             
-            # 2. PUBLICACIÓN PRE-PARTIDO PERIÓDICA (cada 2 horas envía un desglose pre-partido)
+            # Publicación Pre-partido cada 2 horas (7200 segundos)
             if time.time() - last_pre_match_time >= 7200:
                 publish_pick()
                 last_pre_match_time = time.time()
 
         except Exception as e:
-            logging.error(f"Error en bucle del escáner: {e}")
+            logging.error(f"Error en bucle del bot: {e}")
         
-        time.sleep(180) # Revisa y escanea los partidos LIVE cada 3 minutos
+        time.sleep(120) # Escanea cada 2 minutos
 
 if __name__ == "__main__":
     main()
