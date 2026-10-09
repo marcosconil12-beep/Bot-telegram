@@ -82,7 +82,10 @@ def publish_daily_routine():
     hour, minute = now.hour, now.minute
 
     # Prueba / Envio especial de apertura (09:22 AM)
-    if hour == 9 and minute == 22 and f"special_{today_str}" not in scheduled_tasks:
+    # Prueba inmediata a las 09:36 AM
+    if hour == 9 and minute == 36 and f"special_{today_str}" not in scheduled_tasks:
+        send_telegram_message("☀️ <b>¡BUENOS DÍAS Y BIENVENIDOS A LA JORNADA DE HOY!</b> ☀️\n\nEl sistema ya está activo analizando cuotas y métricas avanzadas. En breve publicaremos las combinadas del día y el Pick Premium Stake 5.")
+        scheduled_tasks.add(f"special_{today_str}")
         send_telegram_message("☀️ <b>¡BUENOS DÍAS Y BIENVENIDOS A LA JORNADA DE HOY!</b> ☀️\n\nEl sistema ya está activo analizando cuotas y métricas avanzadas. En breve publicaremos las combinadas del día y el Pick Premium Stake 5.")
         scheduled_tasks.add(f"special_{today_str}")
 
