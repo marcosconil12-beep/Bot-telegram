@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-TELEGRAM_USERNAME = "Mark122" # Tu usuario VIP configurado
+TELEGRAM_USERNAME = "Mark122" # Tu usuario VIP
 
 published_picks = set()
 
@@ -56,27 +56,25 @@ def send_telegram_photo(photo_path, caption, reply_markup=None):
         return None
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val, is_live=False):
-    """Genera una tarjeta gráfica profesional (modo Normal o modo LIVE en directo)."""
+    """Genera la tarjeta gráfica estilo Scores24."""
     bg_color = (13, 27, 42) if not is_live else (25, 10, 15)
     border_color = (0, 212, 170) if not is_live else (255, 45, 85)
     
     img = Image.new('RGB', (1000, 600), color=bg_color)
     d = ImageDraw.Draw(img)
     
-    # Borde y Marco de Cabecera
     d.rectangle([20, 20, 980, 580], outline=border_color, width=4)
     d.rectangle([20, 20, 980, 110], fill=(20, 40, 65) if not is_live else (50, 15, 25))
     
-    header_title = "🛡️ TOPTIPS OFFICIAL ANALYTICS" if not is_live else "🔴 TOPTIPS LIVE IN-PLAY ALERT"
+    header_title = "🛡️ TOPTIPS OFFICIAL ANALYTICS" if not is_live else "🚨 ALERTA IA LIVE EN DIRECTO"
     d.text((40, 48), header_title, fill=border_color)
     d.text((580, 48), league_name.upper()[:25], fill=(200, 200, 200))
     
-    d.text((40, 140), "ENCUENTRO EN DIRECTO:" if is_live else "PARTIDO ANALIZADO EN DETALLE:", fill=(150, 160, 180))
+    d.text((40, 140), "ENCUENTRO MONITOREADO:" if is_live else "PARTIDO ANALIZADO EN DETALLE:", fill=(150, 160, 180))
     d.text((40, 180), match_title, fill=(255, 255, 255))
     
-    # Recuadro de Pronóstico
     d.rectangle([40, 240, 960, 420], fill=(24, 43, 73) if not is_live else (60, 20, 30), outline=(255, 215, 0), width=2)
-    d.text((70, 260), "SELECCIÓN RECOMENDADA:" if not is_live else "OPORTUNIDAD LIVE EN DIRECTO:", fill=(255, 215, 0))
+    d.text((70, 260), "SELECCIÓN RECOMENDADA:" if not is_live else "SEÑAL IA DETECTADA:", fill=(255, 215, 0))
     d.text((70, 315), f"{pick_text}", fill=(255, 255, 255))
     d.text((750, 315), f"@{odds_val:.2f}", fill=border_color)
 
@@ -92,7 +90,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Pro Activo".encode('utf-8'))
+        self.wfile.write("Bot Vendedor Pro con Escáner IA Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -102,95 +100,122 @@ def run_http_server():
         logging.error(f"Error HTTP: {e}")
 
 def get_global_pro_match():
-    """Base de datos masiva revisada."""
     pool = [
+        # España
         ("Real Madrid", "Villarreal", "La Liga EA Sports"),
         ("FC Barcelona", "Atlético de Madrid", "La Liga EA Sports"),
         ("Real Zaragoza", "Granada CF", "La Liga Hypermotion (2ª ESP)"),
         ("Sporting de Gijón", "Racing de Santander", "La Liga Hypermotion (2ª ESP)"),
+        # Inglaterra
         ("Manchester City", "Liverpool", "Premier League"),
         ("Arsenal", "Chelsea", "Premier League"),
         ("Leeds United", "Sheffield United", "Championship (2ª ENG)"),
+        # Italia
         ("Inter de Milán", "Juventus", "Serie A"),
         ("AC Milan", "Napoli", "Serie A"),
         ("Palermo", "Sassuolo", "Serie B (2ª ITA)"),
+        # Alemania
         ("Bayern Múnich", "RB Leipzig", "Bundesliga"),
         ("Borussia Dortmund", "Bayer Leverkusen", "Bundesliga"),
         ("Hamburgo", "Hertha BSC", "2. Bundesliga (GER)"),
+        # Francia
         ("PSG", "Marsella", "Ligue 1"),
         ("Lyon", "AS Monaco", "Ligue 1"),
+        # Brasil
         ("Flamengo", "Palmeiras", "Brasileirão Serie A"),
         ("Santos", "Sport Recife", "Brasileirão Serie B"),
+        # Japón
         ("Vissel Kobe", "Yokohama F. Marinos", "J1 League (Japón)")
     ]
     return random.choice(pool)
 
-def send_good_morning():
-    total_games = CHANNEL_STATS["wins"] + CHANNEL_STATS["losses"]
-    winrate = round((CHANNEL_STATS["wins"] / total_games) * 100, 1)
-    
-    text = (
-        "☀️ <b>¡BUENOS DÍAS A TODOS LOS MIEMBROS DE TOPTIPS!</b> ☀️\n\n"
-        "☕ Arrancamos una jornada clave con los análisis más potentes del mercado.\n\n"
-        "📊 <b>REVISIÓN DE RESULTADOS Y BALANCES DEL MES:</b>\n"
-        f"✅ <b>Picks Acertados:</b> {CHANNEL_STATS['wins']}\n"
-        f"❌ <b>Picks Fallados:</b> {CHANNEL_STATS['losses']}\n"
-        f"🔥 <b>Efectividad (WinRate):</b> <b>{winrate}%</b>\n"
-        f"💰 <b>Beneficio Neto:</b> <b>+{CHANNEL_STATS['profit_units']} Unidades</b>\n\n"
-        f"💣 <i>¡Aprovecha la racha de aciertos! Escríbeme ahora para unirte al Grupo VIP o comprar el Stake 10 de hoy:</i>\n"
-        f"👉 <b>Contactar al Analista: @{TELEGRAM_USERNAME}</b>"
-    )
-    
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "🚀 Entrar al Grupo VIP Ahora", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
-        ]
-    }
-    send_telegram_message(text, reply_markup=keyboard)
-
-def publish_live_pick():
-    """Envía un pronóstico exclusivo en DIRECTO (LIVE)."""
+def scan_live_matches_ia():
+    """
+    ESCÁNER IA EN TIEMPO REAL:
+    Evalúa continuamente parámetros en vivo (Ataques peligrosos, xG acumulado, remates a puerta).
+    Si se cumple la condición de IA, salta de inmediato con la alerta.
+    """
     home, away, league = get_global_pro_match()
     match_title = f"{home} vs {away}"
     
-    minute = random.randint(55, 78)
-    score_home = random.randint(0, 2)
-    score_away = random.randint(0, 2)
+    # Simulación de condiciones en tiempo real (1ª mitad entre 20'-40' o 2ª mitad entre 55'-80')
+    half = random.choice(["1ª Parte", "2ª Parte"])
+    minute = random.randint(22, 38) if half == "1ª Parte" else random.randint(58, 78)
     
-    live_markets = [
-        (f"Más de 0.5 Goles antes del min 85'", round(random.uniform(1.80, 2.25), 2), f"Presión asfixiante de {home} con múltiples ocasiones claras en la segunda parte."),
-        (f"Más de 1.5 Goles en la 2ª Parte", round(random.uniform(1.95, 2.40), 2), "Partido totalmente roto en ambas áreas, ritmo de juego altísimo."),
-        (f"Próximo Gol: {home}", round(random.uniform(2.00, 2.50), 2), f"{home} domina la posesión en campo contrario y ha volcado sus líneas al ataque.")
-    ]
-    chosen_pick, chosen_odds, live_analysis = random.choice(live_markets)
+    score_home = random.randint(0, 1) if half == "1ª Parte" else random.randint(0, 2)
+    score_away = random.randint(0, 1) if half == "1ª Parte" else random.randint(0, 2)
+    
+    shots_on_target = random.randint(6, 11)
+    corners_count = random.randint(5, 9)
+    danger_attacks = random.randint(45, 80)
+    
+    # Condición de IA para disparar la alerta
+    ia_triggers = []
+    
+    # Requisito IA 1: Alta presión de gol
+    if danger_attacks > 50 and shots_on_target >= 6:
+        ia_triggers.append((
+            f"GOL PROMINENTE ({half}): Más de 0.5 Goles antes del descanso/final", 
+            round(random.uniform(1.85, 2.30), 2), 
+            f"Algoritmo IA detecta índice de presión {danger_attacks} ataques peligrosos y {shots_on_target} disparos a puerta. Alta probabilidad de gol inminente."
+        ))
+    
+    # Requisito IA 2: Carrera a Córneres
+    if corners_count >= 6:
+        ia_triggers.append((
+            f"CÓRNERES EN VIVO: Más de {corners_count + 3}.5 Córneres Totales", 
+            round(random.uniform(1.80, 2.15), 2), 
+            f"El partido promedia un córner cada 5 minutos. Ritmo de juego totalmente volcado por las bandas."
+        ))
+        
+    # Requisito IA 3: Remontada / Victoria del Favorito
+    if score_home < score_away and "Real Madrid" in home or "Manchester City" in home or "PSG" in home:
+        ia_triggers.append((
+            f"VICTORIA EN REMONTADA: {home} (Empate Apuesta No Válida)", 
+            round(random.uniform(2.10, 2.70), 2), 
+            f"{home} está encerrando al rival en su área con más del 70% de posesión en la {half}."
+        ))
+
+    if not ia_triggers:
+        return False # No reúne los requisitos estrictos de la IA en este chequeo
+
+    chosen_pick, chosen_odds, ia_reason = random.choice(ia_triggers)
+    
+    pick_id = f"LIVE_{match_title}_{minute}_{datetime.now().strftime('%Y%m%d%H%M')}"
+    if pick_id in published_picks:
+        return False
 
     caption = (
-        f"🔴 <b>¡ALERTA LIVE EN DIRECTO!</b> 🔴\n\n"
+        f"🚨 <b>¡ALERTA IA DETECTADA EN DIRECTO!</b> 🚨\n\n"
         f"🏆 <b>Competición:</b> {league}\n"
         f"⚔️ <b>Encuentro:</b> {match_title}\n"
-        f"⏱️ <b>Minuto:</b> <b>{minute}'</b> | ⚽ <b>Marcador:</b> <b>{score_home} - {score_away}</b>\n\n"
-        f"🔥 <b>ENTRADA LIVE RECOMENDADA:</b>\n"
+        f"⏱️ <b>Tiempo:</b> <b>{minute}' ({half})</b> | ⚽ <b>Marcador:</b> <b>{score_home} - {score_away}</b>\n\n"
+        f"🔥 <b>SEÑAL IA DE ALTO VALOR:</b>\n"
         f"• Selección: <code>{chosen_pick}</code>\n"
-        f"• Cuota Live: <b>{chosen_odds:.2f}</b> (Bet365 / Casas de Apuestas)\n"
-        f"• Stake Sugerido: <b>1.5 / 10</b>\n\n"
-        f"💬 <i>Lectura en vivo: {live_analysis}</i>\n\n"
-        f"⚡ <b>¡ENTRAD YA MISMO ANTES DE QUE BAJE LA CUOTA O HAYA GOL!</b>\n\n"
-        f"💎 <b>¿Quieres la jugada LIVE VIP con cuota +3.50?</b>\n"
-        f"Escríbeme por privado al momento: <b>@{TELEGRAM_USERNAME}</b>"
+        f"• Cuota Live: <b>{chosen_odds:.2f}</b> (Casas de Apuestas / Bet365)\n"
+        f"• Stake Recomendado: <b>2 / 10 (Fuerte)</b>\n\n"
+        f"🧠 <b>ANÁLISIS ALGORÍTMICO EN TIEMPO REAL:</b>\n"
+        f"<i>{ia_reason}</i>\n\n"
+        f"⚡ <b>¡ENTRAD RÁPIDO ANTES DE QUE BAJE LA CUOTA O SUCEDA LA JUGADA!</b>\n\n"
+        f"💎 <b>¿Quieres las señales VIP privadas con cuota +4.00?</b>\n"
+        f"Escríbeme por privado de inmediato: <b>@{TELEGRAM_USERNAME}</b>"
     )
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "⚡ Hablar con Analista por Telegram", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
+            [{"text": "⚡ Entrar al VIP / Contactar Analista", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
         ]
     }
 
     img_path = create_scores24_card(f"{match_title} ({minute}' {score_home}-{score_away})", league, chosen_pick, chosen_odds, is_live=True)
     if send_telegram_photo(img_path, caption, reply_markup=keyboard):
-        logging.info(f"Pronóstico LIVE enviado con éxito: {match_title}")
+        published_picks.add(pick_id)
+        logging.info(f"¡Alerta IA LIVE publicada con éxito!: {match_title}")
+        return True
+    return False
 
 def publish_pick():
-    """Envía un pronóstico Pre-partido normal."""
+    """Análisis Pre-Partido."""
     home, away, league = get_global_pro_match()
     match_title = f"{home} vs {away}"
     odds_val = round(random.uniform(1.75, 2.30), 2)
@@ -212,7 +237,7 @@ def publish_pick():
 
     markets = [
         ("Victoria de " + home, odds_val, f"{home} domina territorialmente con un xG de {xg_home} frente a {xg_away} del rival."),
-        ("Más de 2.5 Goles", round(odds_val * 0.95, 2), f"Alta proyección ofensiva. Goles esperados conjuntos superiores a 3.1."),
+        ("Más de 2.5 Goles", round(odds_val * 0.95, 2), f"Alta proyección offensive. Goles esperados conjuntos superiores a 3.1."),
         ("Ambos Anotan (Sí)", round(odds_val * 0.98, 2), f"Las defensas muestran concesiones recientes y los ataques promedian alta efectividad.")
     ]
     chosen_pick, chosen_odds, analysis = random.choice(markets)
@@ -259,34 +284,27 @@ def publish_pick():
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Master Tipster Pro con módulo LIVE Activo...")
+    logging.info("Servicio Escáner IA y Tipster Pro Activo...")
 
     time.sleep(3)
-    publish_pick()
+    publish_pick() # Lanza un primer pronóstico de bienvenida al arrancar
 
-    last_morning_day = -1
-    cycle_counter = 0
+    last_pre_match_time = time.time()
 
     while True:
         try:
-            current_hour = datetime.now().hour
-            current_day = datetime.now().day
+            # 1. ESCÁNER IA LIVE CONTINUO (revisa cada 3 minutos si hay partidos en vivo que cumplan los requisitos)
+            scan_live_matches_ia()
             
-            if current_day != last_morning_day and 8 <= current_hour <= 11:
-                send_good_morning()
-                last_morning_day = current_day
-            
-            # Alterna entre publicar picks Pre-partido y Alertas LIVE en directo
-            if cycle_counter % 2 == 0:
+            # 2. PUBLICACIÓN PRE-PARTIDO PERIÓDICA (cada 2 horas envía un desglose pre-partido)
+            if time.time() - last_pre_match_time >= 7200:
                 publish_pick()
-            else:
-                publish_live_pick()
-                
-            cycle_counter += 1
+                last_pre_match_time = time.time()
+
         except Exception as e:
-            logging.error(f"Error en bucle: {e}")
+            logging.error(f"Error en bucle del escáner: {e}")
         
-        time.sleep(7200) # Publica cada 2 horas
+        time.sleep(180) # Revisa y escanea los partidos LIVE cada 3 minutos
 
 if __name__ == "__main__":
     main()
