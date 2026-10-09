@@ -94,52 +94,41 @@ def run_http_server():
     except Exception as e:
         logging.error(f"Error servidor HTTP: {e}")
 
-def fetch_today_real_matches():
-    """Obtiene únicamente partidos programados para el día de hoy en la API."""
+def fetch_active_matches():
+    """Obtiene los partidos disponibles en la API global actual."""
     if not ODDS_API_KEY:
         return []
     url = f"https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h"
     try:
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
-            events = res.json()
-            today_date = datetime.now().strftime("%Y-%m-%d")
-            today_events = []
-            
-            for event in events:
-                commence_time = event.get("commence_time", "")
-                # Comprobamos que el partido sea de hoy
-                if commence_time.startswith(today_date):
-                    today_events.append(event)
-            return today_events
+            return res.json()
     except Exception as e:
-        logging.error(f"Error obteniendo partidos de hoy: {e}")
+        logging.error(f"Error obteniendo partidos: {e}")
     return []
 
 def generate_tipster_content():
-    """Busca partidos reales de hoy y publica solo si encuentra encuentros vigentes."""
-    events = fetch_today_real_matches()
+    """Selecciona un partido activo y publica el pronóstico profesional."""
+    events = fetch_active_matches()
     
-    # Si hoy no hay partidos en la API, no publica nada falso ni antiguo (se queda a la espera)
     if not events:
-        logging.info("No hay partidos programados para hoy en este momento. Esperando nueva jornada...")
+        logging.info("Buscando partidos disponibles...")
         return
 
     event = random.choice(events)
     home = event.get("home_team", "Equipo Local")
-    away = event.get("home_team", "Equipo Visitante") # Corregido por seguridad
     away = event.get("away_team", "Equipo Visitante")
     league = event.get("sport_title", "Fútbol Internacional")
     match_title = f"{home} vs {away}"
 
     event_id = event.get("id", match_title)
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = datetime.now().strftime("%Y-%m-%d-%H")
     pick_id = f"{event_id}_{today_str}"
     
     if pick_id in published_picks:
         return
 
-    # Extraer cuota real de la casa si está disponible
+    # Extraer cuota real de la casa
     odds_val = 2.00
     if event.get("bookmakers") and len(event["bookmakers"]) > 0:
         markets = event["bookmakers"][0].get("markets", [])
@@ -147,9 +136,9 @@ def generate_tipster_content():
             odds_val = markets[0]["outcomes"][0].get("price", 2.00)
 
     market_options = [
-        ("Victoria de " + home, odds_val, f"Analizando la solidez como local de {home} y las opciones tácticas en este encuentro de hoy, vemos gran valor en esta selección."),
+        ("Victoria de " + home, odds_val, f"Analizando la solidez como local de {home} y las opciones tácticas en este encuentro, vemos gran valor en esta selección."),
         ("Más de 2.5 Goles Totales", 1.85, f"El ritmo ofensivo proyectado para el choque entre {home} y {away} garantiza ocasiones constantes en ambas áreas."),
-        ("Ambos Equipos Anotan (Sí)", 1.90, f"Las estadísticas recientes de ambos conjuntos muestran dinamismo en ataque y opciones claras de ver puerta hoy.")
+        ("Ambos Equipos Anotan (Sí)", 1.90, f"Las estadísticas recientes de ambos conjuntos muestran dinamismo en ataque y opciones claras de ver puerta.")
     ]
 
     chosen_pick, chosen_odds, analysis_text = random.choice(market_options)
@@ -170,18 +159,22 @@ def generate_tipster_content():
     
     if send_telegram_photo(img_path, caption):
         published_picks.add(pick_id)
-        logging.info(f"Pronóstico de hoy publicado con éxito: {match_title}")
+        logging.info(f"Pronóstico publicado con éxito: {match_title}")
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster de Partidos de Hoy Activo...")
+    logging.info("Servicio Tipster Activo y Publicando...")
+
+    # Publica un pronóstico nada más arrancar
+    time.sleep(3)
+    generate_tipster_content()
 
     while True:
         try:
             generate_tipster_content()
         except Exception as e:
             logging.error(f"Error en bucle: {e}")
-        time.sleep(3600) # Comprueba cada hora nuevos partidos de hoy
+        time.sleep(3600) # Publica un nuevo pronóstico cada hora de forma automática
 
 if __name__ == "__main__":
     main()
