@@ -64,20 +64,22 @@ def send_telegram_photo(photo_path, caption):
         return None
 
 def create_toptips_analysis_image(match_title, league_name, pick_text, odds_val):
-    """Genera plantilla visual oficial TOPTIPS."""
+    """Genera la tarjeta gráfica oficial con la estética TOPTIPS."""
     img = Image.new('RGB', (900, 500), color=(11, 19, 43))
     d = ImageDraw.Draw(img)
     
+    # Marco dorado TOPTIPS
     d.rectangle([15, 15, 885, 485], outline=(212, 175, 55), width=4)
     d.text((40, 35), "🛡️ TOPTIPS - INFORME DE INTELIGENCIA DEPORTIVA", fill=(212, 175, 55))
-    d.text((40, 85), f"COMPETICIÓN: {league_name.upper()}", fill=(200, 200, 200))
+    d.text((40, 85), f"COMPETICION: {league_name.upper()}", fill=(200, 200, 200))
     d.text((40, 135), f"ENCUENTRO: {match_title}", fill=(255, 255, 255))
     
+    # Recuadro verde para la recomendación EV+
     d.rectangle([35, 200, 865, 330], fill=(28, 37, 65), outline=(0, 200, 150), width=2)
-    d.text((55, 220), f"SELECCIÓN RECOMENDADA IA:", fill=(0, 200, 150))
+    d.text((55, 220), "SELECCION RECOMENDADA IA:", fill=(0, 200, 150))
     d.text((55, 265), f"{pick_text} @ {odds_val:.2f}", fill=(255, 255, 255))
     
-    d.text((40, 370), "FILTROS ACTIVOS: xG Proyectado | Volumen de Tiros | Presión Táctica", fill=(160, 160, 160))
+    d.text((40, 370), "FILTROS ACTIVOS: xG Proyectado | Volumen de Tiros | Presion Tactica", fill=(160, 160, 160))
     d.text((40, 420), "Canal Oficial Telegram: @FreeTopTip", fill=(212, 175, 55))
     
     filename = "toptips_analysis.png"
@@ -124,9 +126,9 @@ def publish_intelligent_parlays():
 
     events = get_real_events()
     if len(events) < 2:
-        return  # Esperar a tener suficientes partidos para armar combinadas reales
+        return
 
-    # Tomamos partidos reales de la API
+    # Tomamos partidos reales obtenidos de la API
     e1, e2 = events[0], events[1]
     e1_home, e1_away = e1.get("home_team", "Local 1"), e1.get("away_team", "Visitante 1")
     e2_home, e2_away = e2.get("home_team", "Local 2"), e2.get("away_team", "Visitante 2")
@@ -161,9 +163,9 @@ def check_live_and_prematch_picks():
             continue
 
         market_options = [
-            ("⚡ RECOMENDACIÓN 1X2", f"Victoria de {home}", 2.05, f"El equipo local ({home}) llega con mejor métrica de xG."),
-            ("⚽ RECOMENDACIÓN GOLES", "Más de 2.5 Goles Totales", 1.95, f"Tanto {home} como {away} promedian más de 3.2 goles por partido."),
-            ("🚩 RECOMENDACIÓN CÓRNERS", "Más de 9.5 Córners Totales", 2.10, f"Juego vertical por las bandas proyectado para {home} vs {away}.")
+            ("⚡ RECOMENDACIÓN 1X2", f"Victoria de {home}", 2.05, f"El conjunto local ({home}) presenta mejores métricas acumuladas de xG."),
+            ("⚽ RECOMENDACIÓN GOLES", "Más de 2.5 Goles Totales", 1.95, f"Tanto {home} como {away} mantienen un promedio alto de tiros a puerta por partido."),
+            ("🚩 RECOMENDACIÓN CÓRNERS", "Más de 9.5 Córners Totales", 2.10, f"Juego de alta presión por las bandas proyectado para el choque entre {home} y {away}.")
         ]
         
         chosen_mkt, chosen_sel, chosen_odds, analysis_reason = random.choice(market_options)
@@ -192,11 +194,11 @@ def publish_daily_routine():
     minute = now.minute
 
     if hour == 9 and minute == 0 and f"morning_{today_str}" not in scheduled_tasks:
-        send_telegram_message("☀️ <b>¡BUENOS DÍAS A TODOS!</b> ☀️\n\nLos algoritmos TOPTIPS ya están rastreando partidos reales de las grandes ligas para detectar valor.")
+        send_telegram_message("☀️ <b>¡BUENOS DÍAS A TODOS!</b> ☀️\n\nLos algoritmos TOPTIPS ya están rastreando partidos reales de las grandes ligas para detectar valor en Victorias, Goles y Córners.")
         scheduled_tasks.add(f"morning_{today_str}")
 
     if hour == 22 and minute == 30 and f"summary_{today_str}" not in scheduled_tasks:
-        send_telegram_message("📊 <b>RESUMEN Y BALANCE DE LA JORNADA TOPTIPS</b> 📊\n\nAnálisis y seguimiento finalizado por hoy. ¡Mañana más!")
+        send_telegram_message("📊 <b>RESUMEN Y BALANCE DE LA JORNADA TOPTIPS</b> 📊\n\nAnálisis y seguimiento finalizado por hoy. ¡Nos vemos mañana!")
         scheduled_tasks.add(f"summary_{today_str}")
 
 def main():
@@ -209,8 +211,4 @@ def main():
             publish_intelligent_parlays()
             check_live_and_prematch_picks()
         except Exception as e:
-            logging.error(f"Error en el bucle principal: {e}")
-        time.sleep(120)
-
-if __name__ == "__main__":
-    main()
+            logging.error(f"Error en el bucle principal: {
