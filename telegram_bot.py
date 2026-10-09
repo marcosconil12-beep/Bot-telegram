@@ -155,7 +155,7 @@ def publish_pick():
         f"• {away}: {form_away}\n\n"
         f"📊 <b>MÉTRICAS Y xG (Goles Esperados):</b>\n"
         f"• xG {home}: <b>{xg_home}</b> | xG {away}: <b>{xg_away}</b>\n"
-        f"• Total Goles Proyectados: <b>{round(xg_home + xG_away, 1)}</b>\n\n"
+        f"• Total Goles Proyectados: <b>{round(xg_home + xg_away, 1)}</b>\n\n"
         f"🎯 <b>PRONÓSTICO RECOMENDADO:</b>\n"
         f"• Selección: <code>{chosen_pick}</code>\n"
         f"• Cuota: <b>{chosen_odds:.2f}</b> (Bet365)\n\n"
@@ -184,7 +184,7 @@ def main():
             publish_pick()
         except Exception as e:
             logging.error(f"Error en bucle: {e}")
-        time.sleep(7200) # Publica un análisis completo cada 2 horas
+        time.sleep(7200)
 
 if __name__ == "__main__":
     main()
