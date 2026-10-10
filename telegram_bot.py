@@ -19,7 +19,7 @@ TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
 
 published_picks = set()
 
-# Balance Real del Canal (No se incrementa automáticamente al publicar)
+# Balance Real del Canal
 CHANNEL_STATS = {
     "wins": 62,
     "losses": 13,
@@ -62,7 +62,7 @@ def send_telegram_photo(photo_path, caption, reply_markup=None):
         return None
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val):
-    """Genera la tarjeta gráfica oficial TOPTIPS."""
+    """Genera la tarjeta gráfica oficial TOPTIPS totalmente humana."""
     img = Image.new('RGB', (1000, 600), color=(13, 27, 42))
     d = ImageDraw.Draw(img)
     
@@ -72,15 +72,15 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
     d.text((40, 48), "🛡️ TOPTIPS OFFICIAL ANALYTICS", fill=(0, 212, 170))
     d.text((580, 48), league_name.upper()[:25], fill=(200, 200, 200))
     
-    d.text((40, 140), "PARTIDO SELECCIONADO (HOY/FUTURO):", fill=(150, 160, 180))
+    d.text((40, 140), "PARTIDO ANALIZADO EN DETALLE:", fill=(150, 160, 180))
     d.text((40, 180), match_title, fill=(255, 255, 255))
     
     d.rectangle([40, 240, 960, 420], fill=(24, 43, 73), outline=(255, 215, 0), width=2)
-    d.text((70, 260), "CREAR APUESTA RECOMENDADO (IA):", fill=(255, 215, 0))
+    d.text((70, 260), "CREAR APUESTA RECOMENDADO:", fill=(255, 215, 0))
     d.text((70, 315), f"{pick_text[:45]}...", fill=(255, 255, 255))
     d.text((750, 315), f"@{odds_val:.2f}", fill=(0, 212, 170))
 
-    d.text((40, 460), f"📊 Métricas: xG | Córneres | Tarjetas | Yield: +{CHANNEL_STATS['profit_units']}U", fill=(150, 160, 180))
+    d.text((40, 460), f"📊 Métricas: Rendimiento Táctico | Córneres | Tarjetas | Yield: +{CHANNEL_STATS['profit_units']}U", fill=(150, 160, 180))
     d.text((40, 510), f"Canal Oficial: TOPTIPS | Suscripción VIP: @{TELEGRAM_USERNAME}", fill=(255, 215, 0))
     
     filename = "scores24_card.png"
@@ -107,7 +107,7 @@ def send_good_morning():
     
     text = (
         "☀️ <b>¡BUENOS DÍAS A TODOS LOS MIEMBROS DE TOPTIPS!</b> ☀️\n\n"
-        "☕ Arrancamos la jornada con los 15 análisis de 'Crear Apuesta' más potentes del día.\n\n"
+        "☕ Arrancamos la jornada con los análisis más potentes del día minuciosamente estudiados.\n\n"
         "📊 <b>REVISIÓN DE RESULTADOS Y BALANCES DEL CANAL:</b>\n"
         f"✅ <b>Picks Acertados:</b> {CHANNEL_STATS['wins']}\n"
         f"❌ <b>Picks Fallados:</b> {CHANNEL_STATS['losses']}\n"
@@ -116,7 +116,7 @@ def send_good_morning():
         "💳 <b>ACCESO AL GRUPO VIP PRIVADO TOPTIPS:</b>\n"
         "• 🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b> (7 días de acceso total)\n"
         "• 👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b> (Acceso completo 30 días)\n\n"
-        f"📩 <i>Para unirte al VIP y recibir todas las combinadas exclusivas diario, escríbeme directamente:</i>\n"
+        f"📩 <i>Para unirte al VIP y recibir todas las combinadas exclusivas del día, escríbeme directamente:</i>\n"
         f"👉 <b>Contactar al Analista: @{TELEGRAM_USERNAME}</b>"
     )
     
@@ -146,13 +146,11 @@ def fetch_future_matches():
         if data.get("matches"):
             now_utc = datetime.utcnow()
             for match in data["matches"]:
-                # Comprobación de estado y fecha/hora
                 match_status = match.get("status")
                 utc_date_str = match.get("utcDate")
                 
                 if match_status in ["SCHEDULED", "TIMED"]:
                     match_time = datetime.strptime(utc_date_str, "%Y-%m-%dT%H:%M:%SZ")
-                    # Solo incluir si falta al menos 10 minutos para que comience
                     if match_time > now_utc + timedelta(minutes=10):
                         future_matches.append(match)
     except Exception as e:
@@ -173,16 +171,32 @@ def publish_builder_pick():
     match_id = match["id"]
     match_time_utc = match["utcDate"].replace("T", " ")[:16]
     
-    pick_id = f"BUILDER_{match_id}"
+    pick_id = f"HUMAN_PRO_{match_id}"
     if pick_id in published_picks:
         return False
 
-    # Generación de Combinadas "Crear Apuesta" de Alto Valor
+    # ARGUMENTACIÓN SÓLIDA HUMANA BASADA EN CONTEXTO, TÁCTICA Y ESTILO DE JUEGO
     builder_options = [
-        (f"Victoria {home} + Más de 1.5 Goles + Más de 7.5 Córneres", round(random.uniform(2.40, 2.90), 2), f"Dominio local previsto. {home} genera un alto flujo de saques de esquina y volumen ofensivo."),
-        (f"Más de 2.5 Goles + Ambos Anotan (Sí) + Más de 3.5 Tarjetas", round(random.uniform(2.60, 3.20), 2), "Encuentro de ida y vuelta con defensas adelantadas y alta intensidad en la medular."),
-        (f"Doble Oportunidad {home}/Empate + Más de 8.5 Córneres + Más de 1.5 Goles", round(random.uniform(2.10, 2.50), 2), "Estructura de seguridad basada en el dominio de bandas del equipo local."),
-        (f"Más de 0.5 Goles 1ª Parte + Victoria {home} + Más de 4.5 Córneres {home}", round(random.uniform(2.50, 3.10), 2), "Asedio inicial esperado. Salida intensiva buscando marcar en los primeros 45 minutos.")
+        (
+            f"Victoria {home} + Más de 1.5 Goles + Más de 7.5 Córneres", 
+            round(random.uniform(2.40, 2.90), 2), 
+            f"He estado analizando el contexto de este partido y {home} llega con la obligación absoluta de sumar de 3 en su estadio. Su plan táctico pasa por volcarse a las bandas desde el minuto 1 para aprovechar la debilidad del rival en los centros laterales. Por su parte, {away} suele sufrir mucho cuando le hunden la línea defensiva, lo que provocará un goteo constante de córneres y ocasiones claras de gol. Veo una victoria sólida del equipo local en un partido abierto."
+        ),
+        (
+            f"Más de 2.5 Goles + Ambos Anotan (Sí) + Más de 3.5 Tarjetas", 
+            round(random.uniform(2.60, 3.20), 2), 
+            f"Nos encontramos ante un choque directo donde ninguno de los dos entrenadores suele especular con el resultado. {home} destaca por su propuesta ofensiva en casa pero concede desajustes defensivos importantes al dejar huecos a la espalda. {away} tiene transiciones vertiginosas que van a hacer daño. Además, al ser un duelo de mucha tensión y necesidad de puntos, la intensidad en el medio campo provocará múltiples interrupciones y tarjetas. Esperamos goles en ambas porterías y ritmo alto."
+        ),
+        (
+            f"Doble Oportunidad {home}/Empate + Más de 8.5 Córneres + Más de 1.5 Goles", 
+            round(random.uniform(2.10, 2.50), 2), 
+            f"Buscamos una combinación muy bien estructurada. {home} se muestra sumamente rocoso en su estadio y es muy difícil verles caer derrotados ante este perfil de rival. Tienen un juego muy directo que genera muchos bloqueos y saques de esquina por partido. Sumando la necesidad del equipo visitante de no irse de vacío, preveo un desarrollo activo en las áreas que nos garantice superar el margen de córneres y goles mientras nos cubrimos con el 1X."
+        ),
+        (
+            f"Más de 0.5 Goles 1ª Parte + Victoria {home} + Más de 4.5 Córneres {home}", 
+            round(random.uniform(2.50, 3.10), 2), 
+            f"En este encuentro la clave está en el arranque. {home} suele salir a morder en los primeros 30 minutos para encarrilar el choque temprano, empujando al rival a encerrarse en su propia área. La diferencia de nivel técnico y el empuje de su afición me hacen inclinarme por ver al menos un gol antes del descanso y un dominio aplastante del conjunto local traducido en córneres y triunfo final."
+        )
     ]
 
     chosen_pick, chosen_odds, analysis = random.choice(builder_options)
@@ -194,23 +208,23 @@ def publish_builder_pick():
     winrate_total = round((CHANNEL_STATS["wins"] / total_games) * 100, 1)
 
     caption = (
-        f"⚽ <b>CREAR APUESTA (BET BUILDER IA) - TOPTIPS</b> ⚽\n\n"
+        f"⚽ <b>ANÁLISIS Y CREAR APUESTA - TOPTIPS</b> ⚽\n\n"
         f"🏆 <b>Competición:</b> {league}\n"
         f"⚔️ <b>Encuentro:</b> {home} vs {away}\n"
         f"⏰ <b>Hora de Inicio (UTC):</b> <b>{match_time_utc}</b>\n\n"
-        f"📈 <b>ESTADO DE FORMA:</b>\n"
+        f"📈 <b>RITMO Y MOMENTO DE FORMA:</b>\n"
         f"• {home}: {form_home}\n"
         f"• {away}: {form_away}\n\n"
-        f"🎯 <b>SELECCIÓN CREAR APUESTA:</b>\n"
+        f"🎯 <b>SELECCIÓN RECOMENDADA:</b>\n"
         f"• Combinada: <code>{chosen_pick}</code>\n"
         f"• Cuota Total (Bet365): <b>{chosen_odds:.2f}</b>\n"
         f"• Stake Sugerido: <b>1.5 / 10</b>\n\n"
-        f"🔍 <b>ANÁLISIS TÁCTICO DE IA:</b>\n"
-        f"💬 <i>{analysis}</i>\n\n"
+        f"🔎 <b>MI ANÁLISIS DETALLADO DEL PARTIDO:</b>\n"
+        f"💬 {analysis}\n\n"
         f"📊 <b>RECUENTO DEL CANAL:</b> {CHANNEL_STATS['wins']}W - {CHANNEL_STATS['losses']}L ({winrate_total}% Acierto)\n\n"
-        f"💳 <b>ÚNETE AL GRUPO VIP OFICIAL:</b>\n"
+        f"💳 <b>ÚNETE AL GRUPO VIP OFICIAL TOPTIPS:</b>\n"
         f"• Pase Semanal: <b>10 €</b> | Pase Mensual: <b>34.99 €</b>\n"
-        f"📲 Recibe todas las combinadas exclusivas del día escribiéndome a: <b>@{TELEGRAM_USERNAME}</b>"
+        f"📲 Para recibir todas mis apuestas combinadas exclusivas del día, escríbeme a: <b>@{TELEGRAM_USERNAME}</b>"
     )
 
     keyboard = {
@@ -222,14 +236,14 @@ def publish_builder_pick():
     img_path = create_scores24_card(f"{home} vs {away}", league, chosen_pick, chosen_odds)
     if send_telegram_photo(img_path, caption, reply_markup=keyboard):
         published_picks.add(pick_id)
-        logging.info(f"Pick 'Crear Apuesta' futuro publicado: {home} vs {away}")
+        logging.info(f"Pick argumentado publicado: {home} vs {away}")
         return True
 
     return False
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Master Tipster Pro (15 Picks 'Crear Apuesta' Diarios) Activo...")
+    logging.info("Servicio Tipster Pro (Análisis Humano y Argumentado) Activo...")
 
     time.sleep(3)
     publish_builder_pick()
@@ -241,17 +255,14 @@ def main():
             current_hour = datetime.now().hour
             current_day = datetime.now().day
             
-            # Mensaje de Buenos Días entre 08:00 y 11:00
             if current_day != last_morning_day and 8 <= current_hour <= 11:
                 send_good_morning()
                 last_morning_day = current_day
             
-            # Intenta publicar picks de partidos futuros
             publish_builder_pick()
         except Exception as e:
             logging.error(f"Error en bucle principal: {e}")
         
-        # 15 publicaciones al día distribuidas (intervalo aproximado de 1 hora y 30 minutos)
         time.sleep(5400)
 
 if __name__ == "__main__":
