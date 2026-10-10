@@ -128,13 +128,13 @@ def send_good_morning():
     send_telegram_message(text, reply_markup=keyboard)
 
 def fetch_future_matches():
-    """Filtra y devuelve ÚNICAMENTE partidos que aún NO han comenzado."""
+    """Filtra y devuelve partidos programados."""
     if not FOOTBALL_API_KEY:
         logging.warning("Falta configurar FOOTBALL_API_KEY en Railway.")
         return []
     
     today_str = datetime.now().strftime("%Y-%m-%d")
-    future_str = (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
+    future_str = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d")
     
     url = f"https://api.football-data.org/v4/matches?dateFrom={today_str}&dateTo={future_str}"
     headers = {"X-Auth-Token": FOOTBALL_API_KEY}
@@ -150,10 +150,13 @@ def fetch_future_matches():
                 utc_date_str = match.get("utcDate")
                 
                 if match_status in ["SCHEDULED", "TIMED"]:
-                    # Convertir a datetime con zona horaria UTC explícita
                     match_time = datetime.strptime(utc_date_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-                    if match_time > now_utc + timedelta(minutes=10):
+                    if match_time > now_utc:
                         future_matches.append(match)
+            
+            # Si todos los partidos ya habían empezado en la lista filtrada, coge de los programados
+            if not future_matches and data.get("matches"):
+                future_matches = [m for m in data["matches"] if m.get("status") in ["SCHEDULED", "TIMED"]]
     except Exception as e:
         logging.error(f"Error consultando partidos futuros: {e}")
         
@@ -162,10 +165,18 @@ def fetch_future_matches():
 def publish_builder_pick():
     matches = fetch_future_matches()
     if not matches:
-        logging.info("No hay partidos futuros pendientes para analizar en este momento.")
+        logging.info("Buscando partidos disponibles...")
         return False
 
-    match = random.choice(matches)
+    # Filtrar aquellos partidos que no hayan sido publicados aún
+    available_matches = [m for m in matches if f"HUMAN_PRO_{m['id']}" not in published_picks]
+    
+    if not available_matches:
+        # Si se completó el ciclo de los actuales, resetear historial temporal
+        published_picks.clear()
+        available_matches = matches
+
+    match = random.choice(available_matches)
     home = match["homeTeam"]["name"]
     away = match["awayTeam"]["name"]
     league = match["competition"]["name"]
@@ -173,8 +184,6 @@ def publish_builder_pick():
     match_time_utc = match["utcDate"].replace("T", " ")[:16]
     
     pick_id = f"HUMAN_PRO_{match_id}"
-    if pick_id in published_picks:
-        return False
 
     # ARGUMENTACIÓN SÓLIDA HUMANA BASADA EN CONTEXTO, TÁCTICA Y ESTILO DE JUEGO
     builder_options = [
@@ -237,7 +246,7 @@ def publish_builder_pick():
     img_path = create_scores24_card(f"{home} vs {away}", league, chosen_pick, chosen_odds)
     if send_telegram_photo(img_path, caption, reply_markup=keyboard):
         published_picks.add(pick_id)
-        logging.info(f"Pick argumentado publicado: {home} vs {away}")
+        logging.info(f"Pick argumentado publicado con éxito: {home} vs {away}")
         return True
 
     return False
@@ -246,7 +255,7 @@ def main():
     threading.Thread(target=run_http_server, daemon=True).start()
     logging.info("Servicio Tipster Pro (Análisis Humano y Argumentado) Activo...")
 
-    time.sleep(3)
+    # Publicación inmediata al arrancar el bot
     publish_builder_pick()
 
     last_morning_day = -1
@@ -264,7 +273,7 @@ def main():
         except Exception as e:
             logging.error(f"Error en bucle principal: {e}")
         
-        time.sleep(5400)
+        time.sleep(5400) # Publica progresivamente cada 1 hora y media
 
 if __name__ == "__main__":
     main()
