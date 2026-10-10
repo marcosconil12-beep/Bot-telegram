@@ -4,7 +4,7 @@ import logging
 import threading
 import requests
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from PIL import Image, ImageDraw
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -144,13 +144,14 @@ def fetch_future_matches():
         response = requests.get(url, headers=headers, timeout=12)
         data = response.json()
         if data.get("matches"):
-            now_utc = datetime.utcnow()
+            now_utc = datetime.now(timezone.utc)
             for match in data["matches"]:
                 match_status = match.get("status")
                 utc_date_str = match.get("utcDate")
                 
                 if match_status in ["SCHEDULED", "TIMED"]:
-                    match_time = datetime.strptime(utc_date_str, "%Y-%m-%dT%H:%M:%SZ")
+                    # Convertir a datetime con zona horaria UTC explícita
+                    match_time = datetime.strptime(utc_date_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
                     if match_time > now_utc + timedelta(minutes=10):
                         future_matches.append(match)
     except Exception as e:
