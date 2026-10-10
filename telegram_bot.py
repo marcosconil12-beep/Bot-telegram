@@ -177,7 +177,7 @@ def publish_advanced_ai_pick():
         {
             "market": "Córneres (Saques de Esquina)",
             "pick": "Más de 9.5 Córneres en el Partido",
-            "odds": round(random.uniform, 1.85, 2.10) if 'random.uniform' else round(random.uniform(1.85, 2.10), 2),
+            "odds": round(random.uniform(1.85, 2.10), 2),
             "analysis": "Modelo táctico volcado por bandas. Se proyecta un alto volumen de centros al área y bloqueos defensivos."
         },
         {
@@ -259,7 +259,6 @@ def main():
             current_hour = datetime.now().hour
             current_day = datetime.now().day
             
-            # Envía el saludo de buenos días por la mañana
             if current_day != last_morning_day and 8 <= current_hour <= 11:
                 send_good_morning()
                 last_morning_day = current_day
@@ -268,7 +267,7 @@ def main():
         except Exception as e:
             logging.error(f"Error en bucle principal: {e}")
         
-        time.sleep(7200) # Publica un nuevo pronóstico variado cada 2 horas
+        time.sleep(7200)
 
 if __name__ == "__main__":
     main()
