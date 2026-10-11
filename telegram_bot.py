@@ -5,6 +5,7 @@ import threading
 import requests
 import random
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from PIL import Image, ImageDraw
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -16,6 +17,9 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
 
+# Zona horaria de España
+SPAIN_TZ = ZoneInfo("Europe/Madrid")
+
 # Balance del Canal
 CHANNEL_STATS = {
     "wins": 62,
@@ -25,6 +29,7 @@ CHANNEL_STATS = {
 
 def send_telegram_message(text, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
+        logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID en Railway.")
         return None
     token = str(TELEGRAM_BOT_TOKEN).strip().replace('"', '').replace("'", "")
     chat = str(CHAT_ID).strip().replace('"', '').replace("'", "")
@@ -91,7 +96,7 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
 # --- PUBLICACIONES RFEF ESPAÑA ---
 RFEF_MATCHES = [
     ("Ourense CF vs Zamora CF", "Primera RFEF - Gr. 1", "Victoria Zamora CF (Hándicap 0)", 2.05, "El Zamora se muestra impecable tácticamente como visitante en transiciones rápidas y Ourense deja muchas dudas en salida de balón."),
-    ("UD Logroñés vsCD Numancia", "Segunda RFEF - Gr. 2", "Más de 2.0 Goles Totales", 1.85, "Duelo directo en la parte alta. Ambos promedian un volumen de tiro alto y defensas concediendo ocasiones a balón parado."),
+    ("UD Logroñés vs CD Numancia", "Segunda RFEF - Gr. 2", "Más de 2.0 Goles Totales", 1.85, "Duelo directo en la parte alta. Ambos promedian un volumen de tiro alto y defensas concediendo ocasiones a balón parado."),
     ("SE Penya Independent vs CE Andratx", "Segunda RFEF - Gr. 3", "Victoria Penya Independent", 2.10, "El factor campo balear y el ritmo físico de Penya Independent marcarán la diferencia en los segundos 45 minutos."),
     ("Tenerife B vs CD Paso", "Segunda RFEF - Gr. 5", "Más de 8.5 Córneres", 1.90, "Partido dinámico de juego por bandas. El filial chicharrero genera una media de 6.5 saques de esquina en su feudo."),
     ("Real Jaén vs UD Maracena", "Tercera RFEF - Gr. 9", "Victoria Real Jaén -1.0 HC", 1.95, "El Jaén impone una presión asfixiante en La Victoria frente a un rival que sufre encajando temprano fuera de casa."),
@@ -154,24 +159,49 @@ def run_http_server():
     except Exception as e:
         logging.error(f"Error HTTP: {e}")
 
+def run_sunday_morning_pack():
+    msg = (
+        "☀️ <b>¡BUENOS DÍAS Y FELIZ DOMINGO DE FÚTBOL!</b> ☀️\n\n"
+        "☕ Arrancamos el día más importante de la semana con la mejor información del mercado.\n\n"
+        "💳 <b>TARIFAS PREMIUM PARA LA JORNADA DEL DOMINGO:</b>\n"
+        "🔥 <b>Pase Día Premium Domingo:</b> <b>5.00 €</b> (Acceso total a la jornada de hoy)\n"
+        "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
+        "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
+        f"📲 Escríbeme directamente para entrar al grupo VIP: <b>@{TELEGRAM_USERNAME}</b>"
+    )
+    send_telegram_message(msg)
+    time.sleep(2)
+    logging.info("Enviando pack de RFEF...")
+    for match in RFEF_MATCHES[:10]:
+        publish_single_pick(match)
+        time.sleep(2)
+
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster Pro en ejecución...")
+    logging.info("Servicio Tipster Pro en ejecución con Hora de España (Europe/Madrid)...")
 
-    last_execution = ""
+    executed_tasks = set()
 
     while True:
         try:
-            now = datetime.now()
-            weekday = now.weekday() # 0: Lunes, 4: Viernes, 5: Sábado, 6: Domingo
-            hour = now.hour
-            minute = now.minute
-            time_key = f"{now.strftime('%Y-%m-%d')}_{hour}_{minute}"
+            now_spain = datetime.now(SPAIN_TZ)
+            weekday = now_spain.weekday() # 0: Lunes, 4: Viernes, 5: Sábado, 6: Domingo
+            hour = now_spain.hour
+            minute = now_spain.minute
+            date_str = now_spain.strftime("%Y-%m-%d")
 
             # --- DOMINGO (6) ---
             if weekday == 6:
-                # 08:00 - Buenos Días Domingo
-                if hour == 8 and minute == 0 and last_execution != f"{time_key}_sun_0800":
+                # Publicación combinada especial para HOY a las 10:00 AM (Buenos Días + 10 Picks RFEF)
+                task_id_10 = f"{date_str}_sun_1000_combined"
+                if hour == 10 and minute == 0 and task_id_10 not in executed_tasks:
+                    logging.info("Lanzando publicación combinada de las 10:00 AM...")
+                    run_sunday_morning_pack()
+                    executed_tasks.add(task_id_10)
+
+                # 08:00 - Buenos Días Domingo (Para domingos futuros)
+                task_id = f"{date_str}_sun_0800"
+                if hour == 8 and minute == 0 and task_id not in executed_tasks:
                     msg = (
                         "☀️ <b>¡BUENOS DÍAS Y FELIZ DOMINGO DE FÚTBOL!</b> ☀️\n\n"
                         "☕ Arrancamos el día más importante de la semana con la mejor información del mercado.\n\n"
@@ -182,33 +212,36 @@ def main():
                         f"📲 Escríbeme directamente para entrar al grupo VIP: <b>@{TELEGRAM_USERNAME}</b>"
                     )
                     send_telegram_message(msg)
-                    last_execution = f"{time_key}_sun_0800"
+                    executed_tasks.add(task_id)
 
-                # 08:30 - Pack 10 RFEF
-                elif hour == 8 and minute == 30 and last_execution != f"{time_key}_sun_0830":
+                # 08:30 - Pack 10 RFEF (Para domingos futuros)
+                task_id = f"{date_str}_sun_0830"
+                if hour == 8 and minute == 30 and task_id not in executed_tasks:
                     for match in RFEF_MATCHES[:10]:
                         publish_single_pick(match)
                         time.sleep(2)
-                    last_execution = f"{time_key}_sun_0830"
+                    executed_tasks.add(task_id)
 
                 # 12:00 - Pack 3 Matinales
-                elif hour == 12 and minute == 0 and last_execution != f"{time_key}_sun_1200":
+                task_id = f"{date_str}_sun_1200"
+                if hour == 12 and minute == 0 and task_id not in executed_tasks:
                     for match in GLOBAL_MATCHES[:3]:
                         publish_single_pick(match)
                         time.sleep(2)
-                    last_execution = f"{time_key}_sun_1200"
+                    executed_tasks.add(task_id)
 
                 # 14:30 - Pack 10 Tarde
-                elif hour == 14 and minute == 30 and last_execution != f"{time_key}_sun_1430":
+                task_id = f"{date_str}_sun_1430"
+                if hour == 14 and minute == 30 and task_id not in executed_tasks:
                     for match in (GLOBAL_MATCHES + RFEF_MATCHES)[:10]:
                         publish_single_pick(match)
                         time.sleep(2)
-                    last_execution = f"{time_key}_sun_1430"
+                    executed_tasks.add(task_id)
 
             # --- VIERNES (4) ---
             elif weekday == 4:
-                # 08:00 - Buenos Días Viernes
-                if hour == 8 and minute == 0 and last_execution != f"{time_key}_fri_0800":
+                task_id = f"{date_str}_fri_0800"
+                if hour == 8 and minute == 0 and task_id not in executed_tasks:
                     msg = (
                         "☀️ <b>¡BUENOS DÍAS! LLEGA EL FIN DE SEMANA</b> ☀️\n\n"
                         "💳 <b>TARIFAS ESPECIALES FIN DE SEMANA:</b>\n"
@@ -218,19 +251,19 @@ def main():
                         f"📲 Contáctame para unirte ahora: <b>@{TELEGRAM_USERNAME}</b>"
                     )
                     send_telegram_message(msg)
-                    last_execution = f"{time_key}_fri_0800"
+                    executed_tasks.add(task_id)
 
-                # 12:00 - 2 Picks Viernes
-                elif hour == 12 and minute == 0 and last_execution != f"{time_key}_fri_1200":
+                task_id = f"{date_str}_fri_1200"
+                if hour == 12 and minute == 0 and task_id not in executed_tasks:
                     for match in GLOBAL_MATCHES[:2]:
                         publish_single_pick(match)
                         time.sleep(2)
-                    last_execution = f"{time_key}_fri_1200"
+                    executed_tasks.add(task_id)
 
             # --- SÁBADO (5) ---
             elif weekday == 5:
-                # 08:00 - Buenos Días Sábado
-                if hour == 8 and minute == 0 and last_execution != f"{time_key}_sat_0800":
+                task_id = f"{date_str}_sat_0800"
+                if hour == 8 and minute == 0 and task_id not in executed_tasks:
                     msg = (
                         "☀️ <b>¡BUENOS DÍAS! JORNADA FUERTE DE SÁBADO</b> ☀️\n\n"
                         "💳 <b>TARIFAS GRUPO VIP SÁBADO:</b>\n"
@@ -240,19 +273,19 @@ def main():
                         f"📲 Escríbeme para unirte al VIP: <b>@{TELEGRAM_USERNAME}</b>"
                     )
                     send_telegram_message(msg)
-                    last_execution = f"{time_key}_sat_0800"
+                    executed_tasks.add(task_id)
 
-                # 11:00 - 3 Picks Sábado
-                elif hour == 11 and minute == 0 and last_execution != f"{time_key}_sat_1100":
+                task_id = f"{date_str}_sat_1100"
+                if hour == 11 and minute == 0 and task_id not in executed_tasks:
                     for match in GLOBAL_MATCHES[:3]:
                         publish_single_pick(match)
                         time.sleep(2)
-                    last_execution = f"{time_key}_sat_1100"
+                    executed_tasks.add(task_id)
 
             # --- LUNES A JUEVES (0, 1, 2, 3) ---
             else:
-                # 08:00 - Buenos Días Diario
-                if hour == 8 and minute == 0 and last_execution != f"{time_key}_weekday_0800":
+                task_id = f"{date_str}_weekday_0800"
+                if hour == 8 and minute == 0 and task_id not in executed_tasks:
                     msg = (
                         "☀️ <b>¡BUENOS DÍAS A TODOS!</b> ☀️\n\n"
                         "☕ Arrancamos la jornada analizando las mejores oportunidades del día.\n\n"
@@ -262,19 +295,19 @@ def main():
                         f"📲 Escríbeme para unirte: <b>@{TELEGRAM_USERNAME}</b>"
                     )
                     send_telegram_message(msg)
-                    last_execution = f"{time_key}_weekday_0800"
+                    executed_tasks.add(task_id)
 
-                # 12:00 - 3 Picks Diarios
-                elif hour == 12 and minute == 0 and last_execution != f"{time_key}_weekday_1200":
+                task_id = f"{date_str}_weekday_1200"
+                if hour == 12 and minute == 0 and task_id not in executed_tasks:
                     for match in GLOBAL_MATCHES[:3]:
                         publish_single_pick(match)
                         time.sleep(2)
-                    last_execution = f"{time_key}_weekday_1200"
+                    executed_tasks.add(task_id)
 
         except Exception as e:
             logging.error(f"Error en bucle principal: {e}")
 
-        time.sleep(30) # Comprobación de horario cada 30 segundos
+        time.sleep(15) # Comprobación constante cada 15 segundos
 
 if __name__ == "__main__":
     main()
