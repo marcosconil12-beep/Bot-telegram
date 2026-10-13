@@ -35,11 +35,12 @@ CHANNEL_STATS = {
     "yield_pct": 28.5
 }
 
-# Base de datos local optimizada estilo Scores24
-TODAY_MATCHES_POOL = [
+# Partidos programados para disputarse HOY (13 de Octubre de 2026) con hora exacta de inicio
+TODAY_MATCHES_SCHEDULE = [
     {
         "match": "España vs Italia",
         "league": "UEFA Nations League",
+        "kickoff": "20:45 CEST",
         "analysis": "• Dinámica táctica: La Roja mantiene un promedio de posesión del 64% en su feudo, buscando superioridad por bandas.\n• Bloque rival: Italia propone un sistema ultracompacto en bloque bajo, priorizando el contragolpe.\n• Métrica Scores24: Se prevé un volumen alto de saques de esquina según las estadísticas de centros al área.",
         "pick_main": "Crear Apuesta: España O Empate + Más de 7.5 Córneres",
         "odds_main": 2.15,
@@ -49,7 +50,8 @@ TODAY_MATCHES_POOL = [
     {
         "match": "Francia vs Alemania",
         "league": "Partido Internacional de Selecciones",
-        "analysis": "• Estado de forma: Duelo estelar con los tridentes ofensivos titulares confirmados en ambos combinados.\n• Métricas avanzadas: Promedio conjunto superior a 13.5 remates directos a puerta por partido.\n• Clave de valor: Ritmo alto en transiciones rápidas que favorece las ocasiones en ambas áreas.",
+        "kickoff": "21:00 CEST",
+        "analysis": "• Estado de forma: Duelo estelar de esta noche con los tridentes ofensivos titulares confirmados.\n• Métricas avanzadas: Promedio conjunto superior a 13.5 remates directos a puerta por partido.\n• Clave de valor: Ritmo alto en transiciones rápidas que favorece las ocasiones en ambas áreas.",
         "pick_main": "Crear Apuesta: Ambos Anotan (Sí) + Más de 2.5 Goles",
         "odds_main": 2.20,
         "pick_alt": "Más de 1.5 Goles en la 1ª Mitad",
@@ -58,6 +60,7 @@ TODAY_MATCHES_POOL = [
     {
         "match": "Brasil vs Colombia",
         "league": "Eliminatorias Conmebol",
+        "kickoff": "23:30 CEST",
         "analysis": "• Propuesta de juego: La canarinha busca desbordar con extremos abiertos para generar superioridad numérica.\n• Planteamiento visitante: Colombia apuesta por un bloque dinámico y transiciones verticales rápidas.\n• Tendencia Scores24: Alta efectividad en saques de esquina favorables al equipo local.",
         "pick_main": "Victoria Brasil + Más de 1.5 Goles Totales",
         "odds_main": 2.10,
@@ -87,7 +90,7 @@ def send_telegram_photo(photo_path, caption):
         logging.error(f"Excepción foto: {e}")
         return False
 
-def create_scores24_card(match_title, league_name, pick_text, odds_val):
+def create_scores24_card(match_title, league_name, pick_text, odds_val, kickoff_time):
     try:
         img = Image.new('RGB', (1000, 600), color=(13, 27, 42))
         d = ImageDraw.Draw(img)
@@ -95,10 +98,10 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         d.rectangle([20, 20, 980, 580], outline=(0, 212, 170), width=4)
         d.rectangle([20, 20, 980, 110], fill=(20, 40, 65))
         
-        d.text((40, 48), "🛡️ SCORES24 ESPAÑA - ANALYTICS", fill=(0, 212, 170))
+        d.text((40, 48), "🛡️ SCORES24 ESPAÑA | PREVIA DE HOY", fill=(0, 212, 170))
         d.text((580, 48), league_name.upper()[:25], fill=(200, 200, 200))
         
-        d.text((40, 140), "PARTIDO ANALIZADO (HOY):", fill=(150, 160, 180))
+        d.text((40, 140), f"PARTIDO DE HOY (INICIO: {kickoff_time}):", fill=(150, 160, 180))
         d.text((40, 180), match_title, fill=(255, 255, 255))
         
         d.rectangle([40, 240, 960, 420], fill=(24, 43, 73), outline=(255, 215, 0), width=2)
@@ -117,10 +120,11 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         return None
 
 def publish_scores24_report():
-    item = random.choice(TODAY_MATCHES_POOL)
+    item = random.choice(TODAY_MATCHES_SCHEDULE)
 
     match_title = item.get("match")
     league_name = item.get("league")
+    kickoff_time = item.get("kickoff")
     analysis_text = item.get("analysis")
     pick_main = item.get("pick_main")
     odds_main = float(item.get("odds_main", 2.00))
@@ -128,12 +132,15 @@ def publish_scores24_report():
     odds_alt = float(item.get("odds_alt", 1.60))
 
     now_spain = datetime.now(SPAIN_TZ)
+    date_str = now_spain.strftime('%d/%m/%Y')
+
     caption = (
-        f"📊 <b>ESTADÍSTICAS Y ANÁLISIS TÁCTICO ({now_spain.strftime('%d/%m/%Y')})</b> 📊\n"
+        f"📊 <b>PREVIA DE HOY ({date_str})</b> 📊\n"
         f"🌐 <i>Fuente Oficial: Datos & Estadísticas Scores24</i>\n\n"
         f"🏆 <b>Competición:</b> {league_name}\n"
-        f"⚔️ <b>Encuentro:</b> {match_title}\n\n"
-        f"📋 <b>INFORME MINUSIOSO DE PARTIDO:</b>\n"
+        f"⚔️ <b>Encuentro:</b> {match_title}\n"
+        f"⏰ <b>Hora de Inicio:</b> HOY a las <b>{kickoff_time}</b>\n\n"
+        f"📋 <b>INFORME TÁCTICO Y PREVIA:</b>\n"
         f"{analysis_text}\n\n"
         f"🎯 <b>PRONÓSTICO PRINCIPAL (BET365):</b>\n"
         f"• Selección: <code>{pick_main}</code>\n"
@@ -145,7 +152,7 @@ def publish_scores24_report():
         f"📲 Escríbeme por privado: <a href='https://t.me/{TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a>"
     )
 
-    img_path = create_scores24_card(match_title, league_name, pick_main, odds_main)
+    img_path = create_scores24_card(match_title, league_name, pick_main, odds_main, kickoff_time)
     
     sent = False
     if img_path:
@@ -157,7 +164,7 @@ def send_daily_sales_message():
     now_spain = datetime.now(SPAIN_TZ)
     msg = (
         f"☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip! ({now_spain.strftime('%d/%m/%Y')})</b> ☀️\n\n"
-        "☕ Arrancamos la jornada compartiendo informes estadísticos detallados y análisis de valor de los partidos programados para hoy al estilo Scores24.\n\n"
+        "☕ Arrancamos la jornada publicando los mejores análisis de los partidos que se disputan HOY con métricas de valor.\n\n"
         "💳 <b>ACCESO AL GRUPO VIP PRIVADO:</b>\n"
         "🔥 <b>Pase Día Premium:</b> <b>5.00 €</b>\n"
         "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
@@ -193,7 +200,7 @@ def main():
     while True:
         try:
             time.sleep(900)
-            logging.info("Ejecutando nuevo ciclo de publicación...")
+            logging.info("Ejecutando ciclo de publicación pre-partido...")
             publish_scores24_report()
         except Exception as e:
             logging.error(f"Error en bucle de publicación: {e}")
