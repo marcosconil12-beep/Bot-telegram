@@ -35,7 +35,7 @@ CHANNEL_STATS = {
     "yield_pct": 28.5
 }
 
-# Base de datos optimizada con partidos reales de la jornada de hoy (13 de Octubre de 2026)
+# Base de datos local optimizada estilo Scores24
 TODAY_MATCHES_POOL = [
     {
         "match": "España vs Italia",
@@ -45,15 +45,6 @@ TODAY_MATCHES_POOL = [
         "odds_main": 2.15,
         "pick_alt": "España Más de 1.5 Goles",
         "odds_alt": 1.62
-    },
-    {
-        "match": "Argentina vs Uruguay",
-        "league": "Eliminatorias Conmebol",
-        "analysis": "• Análisis de rendimiento: Máxima fricción en la medular con un promedio superior a 5.5 tarjetas amarillas.\n• xG ofensivo: La albiceleste acumula 2.25 goles esperados jugando como local en eliminatorias directas.\n• Tendencia estadística: Intensidad defensiva visitante elevada en los primeros 45 minutos.",
-        "pick_main": "Crear Apuesta: Victoria Argentina + Más de 4.5 Tarjetas",
-        "odds_main": 2.30,
-        "pick_alt": "Argentina Empate No Válido",
-        "odds_alt": 1.48
     },
     {
         "match": "Francia vs Alemania",
@@ -80,13 +71,7 @@ def send_telegram_message(text):
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
     try:
         res = requests.post(url, json=payload, timeout=15)
-        res_json = res.json()
-        if res_json.get("ok"):
-            logging.info("¡Mensaje publicado en Telegram con éxito!")
-            return True
-        else:
-            logging.error(f"Error Telegram: {res_json}")
-            return False
+        return res.json().get("ok")
     except Exception as e:
         logging.error(f"Excepción Telegram: {e}")
         return False
@@ -97,15 +82,9 @@ def send_telegram_photo(photo_path, caption):
         with open(photo_path, 'rb') as photo:
             data = {"chat_id": CHAT_ID, "caption": caption, "parse_mode": "HTML"}
             res = requests.post(url, data=data, files={"photo": photo}, timeout=20)
-            res_json = res.json()
-            if res_json.get("ok"):
-                logging.info("¡Foto e informe publicados con éxito en Telegram!")
-                return True
-            else:
-                logging.error(f"Error foto Telegram: {res_json}")
-                return False
+            return res.json().get("ok")
     except Exception as e:
-        logging.error(f"Excepción enviando foto: {e}")
+        logging.error(f"Excepción foto: {e}")
         return False
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val):
@@ -138,7 +117,6 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         return None
 
 def publish_scores24_report():
-    logging.info("Seleccionando partido verificado de la jornada de hoy...")
     item = random.choice(TODAY_MATCHES_POOL)
 
     match_title = item.get("match")
@@ -212,11 +190,10 @@ def main():
 
     publish_scores24_report()
 
-    # Bucle continuo: Publica un nuevo informe estadístico completo cada 15 minutos (900 segundos)
     while True:
         try:
             time.sleep(900)
-            logging.info("Ejecutando nuevo ciclo de publicación en el canal...")
+            logging.info("Ejecutando nuevo ciclo de publicación...")
             publish_scores24_report()
         except Exception as e:
             logging.error(f"Error en bucle de publicación: {e}")
