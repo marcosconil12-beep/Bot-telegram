@@ -4,7 +4,6 @@ import logging
 import threading
 import requests
 import json
-import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from PIL import Image, ImageDraw
@@ -24,6 +23,7 @@ def clean_env(var_name, default_val=""):
 
 TELEGRAM_BOT_TOKEN = clean_env("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 CHAT_ID = clean_env("TELEGRAM_CHAT_ID", "@FreeTopTip")
+GEMINI_API_KEY = clean_env("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g")
 TELEGRAM_USERNAME = "Mark122"
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
@@ -35,46 +35,6 @@ CHANNEL_STATS = {
     "yield_pct": 27.2
 }
 
-# Base de datos rigurosa con partidos de la jornada actual (13 de Octubre de 2026)
-TODAY_SCORES24_MATCHES = [
-    {
-        "match": "España vs Italia",
-        "league": "UEFA Nations League / Clasificación",
-        "analysis": "• Dinámica táctica: España mantiene un promedio de posesión del 64% en su feudo con alta presión tras pérdida.\n• Estado visitante: Italia apuesta por un bloque medio-bajo muy compacto y transiciones rápidas por las bandas.\n• Clave Scores24: Los últimos 3 enfrentamientos directos registraron más de 9.5 córneres totales.",
-        "pick_main": "Crear Apuesta: España O Empate + Más de 7.5 Córneres",
-        "odds_main": 2.15,
-        "pick_alt": "España Más de 1.5 Goles",
-        "odds_alt": 1.62
-    },
-    {
-        "match": "Argentina vs Uruguay",
-        "league": "Eliminatorias Sudamericanas Conmebol",
-        "analysis": "• Análisis de rendimiento: La albiceleste muestra un xG ofensivo de 2.25 jugando como local en eliminatorias.\n• Planteamiento rival: Uruguay propone un partido de máxima fricción física y alta intensidad en la medular.\n• Tendencia estadística: Media acumulada superior a 5.5 tarjetas amarillas por encuentro.",
-        "pick_main": "Crear Apuesta: Victoria Argentina + Más de 4.5 Tarjetas Totales",
-        "odds_main": 2.30,
-        "pick_alt": "Argentina Empate No Válido",
-        "odds_alt": 1.48
-    },
-    {
-        "match": "Francia vs Alemania",
-        "league": "Partido Internacional de Selecciones",
-        "analysis": "• Estudio de bajas y alineaciones: Ambos combinados saltan al césped con sus tridentes ofensivos titulares.\n• Métricas avanzadas: Promedio combinado de 3.2 goles esperados (xG) por partido.\n• Valor de cuota: Altísima probabilidad de intercambio de ocasiones en ambas áreas desde el pitido inicial.",
-        "pick_main": "Crear Apuesta: Ambos Anotan (Sí) + Más de 2.5 Goles",
-        "odds_main": 2.20,
-        "pick_alt": "Más de 1.5 Goles en la 1ª Mitad",
-        "odds_alt": 1.75
-    },
-    {
-        "match": "Brasil vs Colombia",
-        "league": "Eliminatorias Sudamericanas Conmebol",
-        "analysis": "• Estado de forma: Brasil busca desequilibrar por carriles interiores con desborde constante por los extremos.\n• Propuesta visitante: Colombia no se encierra y plantea un duelo abierto de ida y vuelta.\n• Tendencia Scores24: Alta efectividad en remates a puerta de los locales.",
-        "pick_main": "Victoria Brasil + Más de 1.5 Goles Totales",
-        "odds_main": 2.10,
-        "pick_alt": "Brasil Más de 4.5 Córneres",
-        "odds_alt": 1.58
-    }
-]
-
 def send_telegram_message(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
@@ -82,13 +42,13 @@ def send_telegram_message(text):
         res = requests.post(url, json=payload, timeout=15)
         res_json = res.json()
         if res_json.get("ok"):
-            logging.info("¡Mensaje de texto enviado con éxito a Telegram!")
+            logging.info("¡Mensaje publicado en Telegram con éxito!")
             return True
         else:
-            logging.error(f"Telegram rechazó el mensaje: {res_json}")
+            logging.error(f"Error Telegram: {res_json}")
             return False
     except Exception as e:
-        logging.error(f"Excepción al enviar mensaje: {e}")
+        logging.error(f"Excepción Telegram: {e}")
         return False
 
 def send_telegram_photo(photo_path, caption):
@@ -99,13 +59,13 @@ def send_telegram_photo(photo_path, caption):
             res = requests.post(url, data=data, files={"photo": photo}, timeout=20)
             res_json = res.json()
             if res_json.get("ok"):
-                logging.info("¡Foto y análisis publicados con éxito en el canal!")
+                logging.info("¡Foto e informe publicados con éxito en Telegram!")
                 return True
             else:
-                logging.error(f"Telegram rechazó la foto: {res_json}")
+                logging.error(f"Error foto Telegram: {res_json}")
                 return False
     except Exception as e:
-        logging.error(f"Excepción al enviar foto: {e}")
+        logging.error(f"Excepción enviando foto: {e}")
         return False
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val):
@@ -137,10 +97,57 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         logging.error(f"Error generando imagen: {e}")
         return None
 
-def publish_scores24_report():
-    logging.info("Generando informe estadístico Scores24 para partidos de hoy...")
-    item = random.choice(TODAY_SCORES24_MATCHES)
+def fetch_live_gemini_scores24():
+    now_spain = datetime.now(SPAIN_TZ)
+    date_today_str = now_spain.strftime("%A, %d de %B de %Y")
     
+    prompt = f"""
+    Actúa como un experto periodista deportivo y analista de apuestas de Scores24 / Sofascore.
+    FECHA ACTUAL EXACTA: {date_today_str}.
+    
+    INSTRUCCIONES STRICTAS:
+    1. Identifica un partido de fútbol que se dispute HOY MISMO ({date_today_str}). Puede ser de UEFA Nations League, Clasificatorias Internacionales, Ligas Sudamericanas, Copas o Ligas Locales en juego hoy.
+    2. Redacta un análisis profesional e imparcial estilo Scores24 con datos tácticos reales, estadísticas de rendimiento, córneres o xG.
+    3. Propón una Selección Principal en Bet365 (Cuota >= 2.00) y una Opción Secundaria de Cobertura (~1.50-1.70).
+    
+    Responde ÚNICAMENTE con un JSON válido con este formato:
+    {{
+      "match": "Equipo A vs Equipo B",
+      "league": "Competición Exacta",
+      "analysis": "• Análisis táctico del local y visitante.\\n• Estadísticas clave y xG.\\n• Justificación del valor en Bet365.",
+      "pick_main": "Pronóstico Principal exacto",
+      "odds_main": 2.15,
+      "pick_alt": "Pronóstico Secundario de Cobertura",
+      "odds_alt": 1.60
+    }}
+    """
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        headers = {"Content-Type": "application/json"}
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        res = requests.post(url, headers=headers, json=payload, timeout=25)
+        data = res.json()
+        if "candidates" in data and len(data["candidates"]) > 0:
+            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+            elif raw_text.startswith("```"):
+                raw_text = raw_text.replace("```", "").strip()
+            return json.loads(raw_text)
+    except Exception as e:
+        logging.error(f"Error consultando Gemini en tiempo real: {e}")
+    
+    return None
+
+def publish_scores24_report():
+    logging.info("Generando análisis en tiempo real con Gemini...")
+    item = fetch_live_gemini_scores24()
+    
+    if not item:
+        logging.error("No se pudo obtener el análisis dinámico en este intento.")
+        return
+
     match_title = item.get("match")
     league_name = item.get("league")
     analysis_text = item.get("analysis")
@@ -151,7 +158,7 @@ def publish_scores24_report():
 
     now_spain = datetime.now(SPAIN_TZ)
     caption = (
-        f"📊 <b>ESTADÍSTICAS Y ANÁLISIS TÁCTICO ({now_spain.strftime('%d de %B')})</b> 📊\n"
+        f"📊 <b>ESTADÍSTICAS Y ANÁLISIS TÁCTICO ({now_spain.strftime('%d/%m/%Y')})</b> 📊\n"
         f"🌐 <i>Fuente Oficial: Datos & Estadísticas Scores24</i>\n\n"
         f"🏆 <b>Competición:</b> {league_name}\n"
         f"⚔️ <b>Encuentro:</b> {match_title}\n\n"
@@ -164,7 +171,7 @@ def publish_scores24_report():
         f"• Selección: <code>{pick_alt}</code> (@{odds_alt:.2f})\n\n"
         f"📈 <b>ESTADÍSTICAS DEL CANAL:</b> +{CHANNEL_STATS['profit_units']} Unidades ({CHANNEL_STATS['yield_pct']}% Yield)\n\n"
         f"💳 <b>¿QUIERES ACCEDER A LAS COMBINADAS VIP EXCLUSIVAS?</b>\n"
-        f"📲 Escríbeme por privado: <a href='https://t.me/{TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a>"
+        f"📲 Escríbeme por privado: <a href='[https://t.me/](https://t.me/){TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a>"
     )
 
     img_path = create_scores24_card(match_title, league_name, pick_main, odds_main)
@@ -173,20 +180,19 @@ def publish_scores24_report():
     if img_path:
         sent = send_telegram_photo(img_path, caption)
     if not sent:
-        logging.info("Intentando enviar por texto plano...")
         send_telegram_message(caption)
 
 def send_daily_sales_message():
     now_spain = datetime.now(SPAIN_TZ)
     msg = (
-        f"☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip! ({now_spain.strftime('%d de %B')})</b> ☀️\n\n"
+        f"☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip! ({now_spain.strftime('%d/%m/%Y')})</b> ☀️\n\n"
         "☕ Arrancamos la jornada compartiendo informes estadísticos detallados y análisis de valor de los partidos programados para hoy al estilo Scores24.\n\n"
         "💳 <b>ACCESO AL GRUPO VIP PRIVADO:</b>\n"
         "🔥 <b>Pase Día Premium:</b> <b>5.00 €</b>\n"
         "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
         "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
         f"📲 <i>Para unirte al VIP y recibir las combinadas diarias, escríbeme:</i>\n"
-        f"👉 <b>Contactar al Analista: <a href='https://t.me/{TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a></b>"
+        f"👉 <b>Contactar al Analista: <a href='[https://t.me/](https://t.me/){TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a></b>"
     )
     send_telegram_message(msg)
 
@@ -213,10 +219,11 @@ def main():
 
     publish_scores24_report()
 
+    # Publicación periódica limpia cada 15 minutos (900 segundos)
     while True:
         try:
-            time.sleep(600)
-            logging.info("Iniciando nuevo ciclo de publicación...")
+            time.sleep(900)
+            logging.info("Ejecutando nuevo ciclo de publicación...")
             publish_scores24_report()
         except Exception as e:
             logging.error(f"Error en bucle de publicación: {e}")
