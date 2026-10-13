@@ -15,8 +15,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-# Clave de API de Gemini integrada
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g").strip()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
@@ -248,7 +247,6 @@ def main():
     threading.Thread(target=run_http_server, daemon=True).start()
     logging.info("Servicio Tipster Inteligente Gemini en ejecución...")
 
-    # Ejecutar al arrancar para publicar de inmediato
     run_daily_routine()
 
     last_executed_day = -1
