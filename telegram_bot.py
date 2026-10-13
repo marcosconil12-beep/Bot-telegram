@@ -24,7 +24,6 @@ def clean_env(var_name, default_val=""):
 
 TELEGRAM_BOT_TOKEN = clean_env("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 CHAT_ID = clean_env("TELEGRAM_CHAT_ID", "@FreeTopTip")
-GEMINI_API_KEY = clean_env("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g")
 TELEGRAM_USERNAME = "Mark122"
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
@@ -36,6 +35,65 @@ CHANNEL_STATS = {
     "yield_pct": 24.5
 }
 
+# Base de datos dinámica local de partidos y análisis estilo Scores24
+MATCHES_DATABASE = [
+    {
+        "match": "Real Madrid vs Manchester City",
+        "league": "UEFA Champions League",
+        "pick_main": "Crear Apuesta: Ambos Anotan + Más de 8.5 Córneres",
+        "odds_main": 2.20,
+        "pick_alt": "Más de 2.5 Goles Totales",
+        "odds_alt": 1.62,
+        "news": "Alineaciones confirmadas. Titulares habituales sobre el césped con presión alta desde el inicio.",
+        "stats": "Promedio acumulado de 3.4 xG y 10.8 córneres por partido en los últimos encuentros europeos.",
+        "value_reason": "El ritmo de transiciones ofensivas y la velocidad por bandas garantizan múltiples ocasiones claras."
+    },
+    {
+        "match": "Arsenal vs Bayern München",
+        "league": "UEFA Champions League",
+        "pick_main": "Victoria Arsenal + Más de 1.5 Goles",
+        "odds_main": 2.15,
+        "pick_alt": "Arsenal Más de 4.5 Córneres",
+        "odds_alt": 1.55,
+        "news": "El conjunto local llega tras una racha imbatible en casa con solidez en el bloque central.",
+        "stats": "68% de posesión de media en su feudo y solo 0.7 goles encajados por encuentro.",
+        "value_reason": "Dominio territorial claro y debilidad defensiva del rival en repliegues rápidos."
+    },
+    {
+        "match": "FC Barcelona vs Paris Saint-Germain",
+        "league": "UEFA Champions League",
+        "pick_main": "Crear Apuesta: Ambos Anotan + Más de 3.5 Tarjetas",
+        "odds_main": 2.30,
+        "pick_alt": "FC Barcelona O Empate (Doble Oportunidad)",
+        "odds_alt": 1.58,
+        "news": "Duelo de máxima tensión tactica con noticias de rotaciones de última hora en la medular.",
+        "stats": "Promedio de 5.6 tarjetas y más de 14 remates a puerta acumulados por jornada.",
+        "value_reason": "Cuota con valor matemático elevado dada la intensidad del choque en zonas de finalización."
+    },
+    {
+        "match": "Atlético de Madrid vs Borussia Dortmund",
+        "league": "UEFA Champions League",
+        "pick_main": "Victoria Atlético de Madrid + Menos de 4.5 Goles",
+        "odds_main": 2.05,
+        "pick_alt": "Atlético de Madrid Empate No Válido",
+        "odds_alt": 1.50,
+        "news": "El feudo rojiblanco se presenta asfixiante con planteamiento táctico de repliegue y contra.",
+        "stats": "El rival concede un 40% de sus ocasiones a balón parado. Fortín local comprobado.",
+        "value_reason": "La solidez defensiva unida a la efectividad en área rival justifica la ventaja en la cuota."
+    },
+    {
+        "match": "Liverpool vs Atalanta",
+        "league": "UEFA Europa League",
+        "pick_main": "Crear Apuesta: Victoria Liverpool + Más de 2.5 Goles + Más de 7.5 Córneres",
+        "odds_main": 2.10,
+        "pick_alt": "Liverpool Más de 1.5 Goles Individuales",
+        "odds_alt": 1.48,
+        "news": "Ritmo frenético esperado en el feudo local con tridente ofensivo confirmado.",
+        "stats": "Promedio de 12.2 saques de esquina totales e índice de xG superior a 2.8 por partido.",
+        "value_reason": "La propuesta ofensiva de ambos conjuntos asegura un partido de ida y vuelta constante."
+    }
+]
+
 def send_telegram_message(text, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
         logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID.")
@@ -45,7 +103,7 @@ def send_telegram_message(text, reply_markup=None):
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
     try:
-        res = requests.post(url, json=payload, timeout=12)
+        res = requests.post(url, json=payload, timeout=10)
         return res.json().get("ok")
     except Exception as e:
         logging.error(f"Error enviando mensaje: {e}")
@@ -60,7 +118,7 @@ def send_telegram_photo(photo_path, caption, reply_markup=None):
             data = {"chat_id": CHAT_ID, "caption": caption, "parse_mode": "HTML"}
             if reply_markup:
                 data["reply_markup"] = json.dumps(reply_markup)
-            res = requests.post(url, data=data, files={"photo": photo}, timeout=15)
+            res = requests.post(url, data=data, files={"photo": photo}, timeout=12)
             return res.json().get("ok")
     except Exception as e:
         logging.error(f"Error enviando foto: {e}")
@@ -95,67 +153,19 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         logging.error(f"Error generando imagen: {e}")
         return None
 
-def generate_single_scores24_analysis():
-    now_spain = datetime.now(SPAIN_TZ)
-    date_today = now_spain.strftime("%d de %B de %Y")
-    
-    prompt = f"""
-    Eres un periodista deportivo y analista de apuestas estilo Scores24 / Sofascore. Hoy es {date_today}.
-    
-    Genera 1 informe de partido REAL que se juegue HOY ({date_today}) en cualquier liga del mundo.
-    Redacta noticias de última hora, datos tácticos numéricos, selección principal Bet365 (cuota >= 2.00) y opción alternativa.
-    
-    Devuelve ÚNICAMENTE un JSON válido con este formato exacto:
-    {{
-      "match": "Equipo A vs Equipo B",
-      "league": "Nombre de Competición",
-      "pick_main": "Pronóstico Principal exacto",
-      "odds_main": 2.15,
-      "pick_alt": "Pronóstico Secundario",
-      "odds_alt": 1.65,
-      "news": "Noticias de última hora sobre alineaciones y bajas...",
-      "stats": "Estadísticas clave numéricas xG y córneres...",
-      "value_reason": "Justificación táctica y de valor..."
-    }}
-    """
-
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        headers = {"Content-Type": "application/json"}
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        res = requests.post(url, headers=headers, json=payload, timeout=15)
-        data = res.json()
-        if "candidates" in data and len(data["candidates"]) > 0:
-            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            if raw_text.startswith("```json"):
-                raw_text = raw_text.replace("```json", "").replace("```", "").strip()
-            elif raw_text.startswith("```"):
-                raw_text = raw_text.replace("```", "").strip()
-            return json.loads(raw_text)
-    except Exception as e:
-        logging.error(f"Error obteniendo análisis dinámico: {e}")
-    
-    # Datos de respaldo rápido para no dejar de publicar si Gemini tarda
-    fallback_matches = [
-        {"match": "Real Madrid vs Manchester City", "league": "UEFA Champions League", "pick_main": "Crear Apuesta: Ambos Anotan + Más de 8.5 Córneres", "odds_main": 2.20, "pick_alt": "Más de 2.5 Goles", "odds_alt": 1.60, "news": "Bajas confirmadas en el centro del campo y rotaciones en defensa.", "stats": "Promedio de 3.2 xG combinados y 10.4 córneres por encuentro.", "value_reason": "Alta intensidad en transiciones ofensivas favorece las llegadas."},
-        {"match": "Arsenal vs Chelsea", "league": "Premier League", "pick_main": "Victoria Arsenal + Más de 1.5 Goles", "odds_main": 2.10, "pick_alt": "Arsenal Más de 4.5 Córneres", "odds_alt": 1.55, "news": "Alineaciones confirmadas con presión alta desde el primer minuto.", "stats": "El equipo local acumula un 68% de posesión en su feudo.", "value_reason": "Dominio territorial claro sobre la línea defensiva rival."},
-        {"match": "FC Barcelona vs Atlético de Madrid", "league": "LaLiga EA Sports", "pick_main": "Crear Apuesta: Barcelona O Empate + Ambos Anotan", "odds_main": 2.25, "pick_alt": "Más de 4.5 Tarjetas", "odds_alt": 1.65, "news": "Duelo directo por la zona alta con titulares habituales.", "stats": "Media de 5.8 tarjetas y alto volumen de remates a puerta.", "value_reason": "Un partido tenso con valor elevado en cuotas acumuladas."}
-    ]
-    return random.choice(fallback_matches)
-
 def publish_next_content():
-    item = generate_single_scores24_analysis()
+    item = random.choice(MATCHES_DATABASE)
     
-    match_title = item.get("match", "Partido destacado")
-    league_name = item.get("league", "Competición Top")
-    pick_main = item.get("pick_main", "Selección de Valor")
-    odds_main = float(item.get("odds_main", 2.00))
-    pick_alt = item.get("pick_alt", "Opción Cobertura")
-    odds_alt = float(item.get("odds_alt", 1.60))
+    match_title = item.get("match")
+    league_name = item.get("league")
+    pick_main = item.get("pick_main")
+    odds_main = item.get("odds_main")
+    pick_alt = item.get("pick_alt")
+    odds_alt = item.get("odds_alt")
     
-    news_text = item.get("news", "Alineaciones e información del encuentro.")
-    stats_text = item.get("stats", "Estadísticas tácticas avanzadas.")
-    value_text = item.get("value_reason", "Valor de la selección recomendada.")
+    news_text = item.get("news")
+    stats_text = item.get("stats")
+    value_text = item.get("value_reason")
 
     caption = (
         f"⚽ <b>INFORME Y ANÁLISIS DE PARTIDO - @FreeTopTip</b> ⚽\n\n"
@@ -168,7 +178,7 @@ def publish_next_content():
         f"🎯 <b>PRONÓSTICO PRINCIPAL (BET365):</b>\n"
         f"• Selección: <code>{pick_main}</code>\n"
         f"• Cuota: <b>@{odds_main:.2f}</b> | Stake: <b>1.5/10</b>\n\n"
-        f"🛡️ <b>OPCIÓN SEGUNDARIA (COBERTURA):</b>\n"
+        f"🛡️ <b>OPCIÓN SECUNDARIA (COBERTURA):</b>\n"
         f"• Selección: <code>{pick_alt}</code> (@{odds_alt:.2f})\n\n"
         f"💡 <b>JUSTIFICACIÓN DE VALOR:</b>\n"
         f"💬 {value_text}\n\n"
@@ -179,7 +189,7 @@ def publish_next_content():
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Comprar Pase VIP / Contactar al Analista", "url": f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"}]
+            [{"text": "👑 Comprar Pase VIP / Contactar al Analista", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
         ]
     }
 
@@ -203,7 +213,7 @@ def send_daily_sales_message():
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Entrar al Grupo VIP", "url": f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"}]
+            [{"text": "👑 Entrar al Grupo VIP", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
         ]
     }
     send_telegram_message(msg, reply_markup=keyboard)
@@ -213,7 +223,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Hiperactivo en ejecución".encode('utf-8'))
+        self.wfile.write("Bot Tipster Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -224,21 +234,23 @@ def run_http_server():
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster Hiperactivo en ejecución...")
+    logging.info("Servicio Tipster en ejecución...")
 
-    # Mensaje inicial de bienvenida/ventas
+    # Mensaje inicial de ventas
     send_daily_sales_message()
-    time.sleep(5)
+    time.sleep(3)
 
-    # Bucle continuo: Publica un nuevo análisis completo cada 15 minutos (900 segundos)
+    # Publicación inmediata del primer análisis con imagen
+    publish_next_content()
+
+    # Bucle continuo: Publica un nuevo análisis cada 2 minutos (120 segundos)
     while True:
         try:
-            logging.info("Publicando nuevo contenido informativo en el canal...")
+            time.sleep(120)
+            logging.info("Publicando nuevo contenido en el canal...")
             publish_next_content()
         except Exception as e:
-            logging.error(f"Error en bucle continuo: {e}")
-
-        time.sleep(900)
+            logging.error(f"Error en bucle de publicación: {e}")
 
 if __name__ == "__main__":
     main()
