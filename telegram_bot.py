@@ -12,7 +12,6 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Función para limpiar variables de entorno de corchetes, comillas o espacios accidentales
 def clean_env(var_name, default_val=""):
     val = os.environ.get(var_name, default_val)
     if not val:
@@ -22,15 +21,13 @@ def clean_env(var_name, default_val=""):
         val_str = val_str.replace(bad_char, '')
     return val_str.strip()
 
-# Variables de entorno limpias
 TELEGRAM_BOT_TOKEN = clean_env("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 CHAT_ID = clean_env("TELEGRAM_CHAT_ID", "@FreeTopTip")
 GEMINI_API_KEY = clean_env("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g")
-TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
+TELEGRAM_USERNAME = "Mark122"
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
-# Balance del Canal
 CHANNEL_STATS = {
     "wins": 65,
     "losses": 14,
@@ -40,10 +37,9 @@ CHANNEL_STATS = {
 
 def send_telegram_message(text, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
-        logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID en las variables.")
+        logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID.")
         return None
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
@@ -51,7 +47,7 @@ def send_telegram_message(text, reply_markup=None):
         res = requests.post(url, json=payload, timeout=12)
         return res.json().get("ok")
     except Exception as e:
-        logging.error(f"Error enviando mensaje a Telegram: {e}")
+        logging.error(f"Error enviando mensaje: {e}")
         return None
 
 def send_telegram_photo(photo_path, caption, reply_markup=None):
@@ -66,7 +62,7 @@ def send_telegram_photo(photo_path, caption, reply_markup=None):
             res = requests.post(url, data=data, files={"photo": photo}, timeout=15)
             return res.json().get("ok")
     except Exception as e:
-        logging.error(f"Error enviando foto a Telegram: {e}")
+        logging.error(f"Error enviando foto: {e}")
         return None
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val):
@@ -98,64 +94,96 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         logging.error(f"Error generando imagen: {e}")
         return None
 
-def generate_gemini_expert_analysis(match_name, league, pick, odds):
-    """Genera un análisis técnico único, ultra-detallado y con datos específicos por partido."""
+def fetch_scores24_style_picks(count=4):
+    """Llama a la IA para generar análisis de estilo noticioso/Scores24 con datos de partidos reales de hoy."""
+    now_spain = datetime.now(SPAIN_TZ)
+    date_today = now_spain.strftime("%d de %B de %Y")
+    
     prompt = f"""
-    Actúa como un tipster analista de fútbol profesional para el canal de Telegram @FreeTopTip.
-    Escribe un análisis táctico EN PRIMERA PERSONA ("He analizado", "Viendo el comportamiento...", "Me decido por...") extremadamente detallado y específico para este partido:
+    Eres un periodista deportivo y analista de apuestas estilo Scores24 / Sofascore. Hoy es {date_today}.
     
-    - Encuentro: {match_name}
-    - Competición: {league}
-    - Selección / Apuesta: {pick}
-    - Cuota Bet365: {odds}
+    TAREA:
+    Genera {count} análisis completos de partidos REALES de fútbol que se disputen HOY ({date_today}).
     
-    Estructura obligatoria del texto (desarrolla cada punto con datos tácticos reales, estilo de juego, volumen de remates, presión tras pérdida o xG esperados específicos de estos dos equipos):
-    1. **Contexto ambiental y estadio:** Explica cómo afecta el factor cancha, el empuje de la afición local y la propuesta con la que saltan al campo.
-    2. **Estructura táctica del rival:** Analiza los espacios que conceden en defensa, las transiciones ofensivas y por qué este pronóstico encaja con el planteamiento.
-    3. **Relación Riesgo/Beneficio:** Justifica por qué entrar a esta cuota {odds} tiene un valor matemático y estadístico superior en Bet365.
+    Para cada partido redacta un informe profundo que incluya:
+    - Noticias de última hora y estado de los equipos (bajas clave, ausencias, dinámicas recientes).
+    - Estadísticas tácticas relevantes (xG esperados, promedio de córneres, tarjetas o rendimiento como local/visitante).
+    - Selección Principal (Crear Apuesta o Mercado Bet365 a cuota >= 2.00).
+    - Selección Secundaria de cobertura (Cuota más conservadora ~1.50-1.70).
     
-    No repitas frases genéricas. Adapta cada argumento exclusivamente a {match_name}. No incluyas saludos ni despedidas.
+    Devuelve ÚNICAMENTE un array JSON válido con este formato exacto:
+    [
+      {{
+        "match": "Equipo A vs Equipo B",
+        "league": "Nombre de Competición",
+        "pick_main": "Pronóstico Principal exacto",
+        "odds_main": 2.15,
+        "pick_alt": "Pronóstico Secundario de Cobertura",
+        "odds_alt": 1.65,
+        "news": "Noticias de última hora sobre alineaciones y bajas...",
+        "stats": "Estadísticas clave y datos numéricos tácticos...",
+        "value_reason": "Justificación de valor estadístico y cuotas..."
+      }}
+    ]
     """
-    
+
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         headers = {"Content-Type": "application/json"}
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        res = requests.post(url, headers=headers, json=payload, timeout=25)
+        res = requests.post(url, headers=headers, json=payload, timeout=30)
         data = res.json()
         if "candidates" in data and len(data["candidates"]) > 0:
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        else:
-            return f"Contexto ambiental: El ambiente en el feudo local propone un inicio asfixiante con posesiones largas.\n\nEstructura táctica: Las debilidades en la línea defensiva del rival facilitarán múltiples llegadas por bandas.\n\nRelación Riesgo/Beneficio: La cuota {odds} ofrece un valor excelente."
+            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+            elif raw_text.startswith("```"):
+                raw_text = raw_text.replace("```", "").strip()
+            return json.loads(raw_text)
     except Exception as e:
-        logging.error(f"Error en API Gemini para {match_name}: {e}")
-        return f"Contexto ambiental: Analizando el partido {match_name}, la necesidad de puntuar en {league} acelera el ritmo ofensivo.\n\nEstructura táctica: Las transiciones rápidas favorecen esta selección.\n\nRelación Riesgo/Beneficio: Magnífico valor en cuota {odds}."
-
-def publish_pick(match_title, league_name, pick_text, odds_val):
-    analysis_text = generate_gemini_expert_analysis(match_title, league_name, pick_text, odds_val)
+        logging.error(f"Error obteniendo análisis de Gemini: {e}")
     
+    return []
+
+def publish_scores24_pick(item):
+    match_title = item.get("match", "Partido de Hoy")
+    league_name = item.get("league", "Competición")
+    pick_main = item.get("pick_main", "Selección Principal")
+    odds_main = float(item.get("odds_main", 2.00))
+    pick_alt = item.get("pick_alt", "Opción Secundaria")
+    odds_alt = float(item.get("odds_alt", 1.60))
+    
+    news_text = item.get("news", "Bajas y dinámicas recientes.")
+    stats_text = item.get("stats", "Métricas y datos estadísticos.")
+    value_text = item.get("value_reason", "Valor en cuotas Bet365.")
+
     caption = (
-        f"⚽ <b>ANÁLISIS DE VALOR Y PRONÓSTICO - @FreeTopTip</b> ⚽\n\n"
+        f"⚽ <b>INFORME Y ANÁLISIS DE PARTIDO - @FreeTopTip</b> ⚽\n\n"
         f"🏆 <b>Competición:</b> {league_name}\n"
         f"⚔️ <b>Encuentro:</b> {match_title}\n\n"
-        f"🎯 <b>SELECCIÓN RECOMENDADA (BET365):</b>\n"
-        f"• Pronóstico: <code>{pick_text}</code>\n"
-        f"• Cuota Real: <b>{odds_val:.2f}</b>\n"
-        f"• Stake Sugerido: <b>1.5 / 10</b>\n\n"
-        f"🔎 <b>MI ANÁLISIS DETALLADO DEL PARTIDO:</b>\n"
-        f"💬 {analysis_text}\n\n"
-        f"📊 <b>BALANCE DEL CANAL:</b> +{CHANNEL_STATS['profit_units']} Unidades de Beneficio\n\n"
-        f"💳 <b>¿QUIERES ACCEDER A TODAS LAS COMBINADAS VIP DE HOY?</b>\n"
-        f"📲 Escríbeme directamente por privado: <b>@{TELEGRAM_USERNAME}</b>"
+        f"📰 <b>NOTICIAS Y ÚLTIMA HORA:</b>\n"
+        f"• {news_text}\n\n"
+        f"📊 <b>DATOS TÁCTICOS Y ESTADÍSTICAS:</b>\n"
+        f"• {stats_text}\n\n"
+        f"🎯 <b>PRONÓSTICO PRINCIPAL (BET365):</b>\n"
+        f"• Selección: <code>{pick_main}</code>\n"
+        f"• Cuota: <b>@{odds_main:.2f}</b> | Stake: <b>1.5/10</b>\n\n"
+        f"🛡️ <b>OPCIÓN SEGUNDARIA (COBERTURA):</b>\n"
+        f"• Selección: <code>{pick_alt}</code> (@{odds_alt:.2f})\n\n"
+        f"💡 <b>JUSTIFICACIÓN DE VALOR:</b>\n"
+        f"💬 {value_text}\n\n"
+        f"📈 <b>BALANCE ACUMULADO:</b> +{CHANNEL_STATS['profit_units']} Unidades\n\n"
+        f"💳 <b>¿QUIERES RECIBIR LA COMBINADA VIP DE HOY?</b>\n"
+        f"📲 Contacta por privado: <b>@{TELEGRAM_USERNAME}</b>"
     )
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Comprar Pase VIP / Contactar al Analista", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
+            [{"text": "👑 Comprar Pase VIP / Contactar al Analista", "url": f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"}]
         ]
     }
 
-    img_path = create_scores24_card(match_title, league_name, pick_text, odds_val)
+    img_path = create_scores24_card(match_title, league_name, pick_main, odds_main)
     sent = False
     if img_path:
         sent = send_telegram_photo(img_path, caption, reply_markup=keyboard)
@@ -163,34 +191,20 @@ def publish_pick(match_title, league_name, pick_text, odds_val):
         send_telegram_message(caption, reply_markup=keyboard)
 
 def send_daily_sales_message():
-    now_spain = datetime.now(SPAIN_TZ)
-    weekday = now_spain.weekday()
-    
-    if weekday in [4, 5, 6]: # Viernes, Sábado, Domingo
-        msg = (
-            "☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip!</b> ☀️\n\n"
-            "☕ Arrancamos una jornada cargada de análisis en los mejores partidos del día.\n\n"
-            "💳 <b>TARIFAS GRUPO VIP PRIVADO:</b>\n"
-            "🔥 <b>Pase Día Premium:</b> <b>5.00 €</b>\n"
-            "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
-            "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
-            f"📲 <i>Escríbeme por privado para entrar al Grupo VIP:</i>\n"
-            f"👉 <b>Contactar al Analista: @{TELEGRAM_USERNAME}</b>"
-        )
-    else: # Lunes a Jueves
-        msg = (
-            "☀️ <b>¡BUENOS DÍAS A TODOS! JORNADA DE VALOR DE HOY</b> ☀️\n\n"
-            "☕ Ya tenemos filtrados los encuentros del día con mayor valor táctico.\n\n"
-            "💳 <b>ACCESO ACCUMULATOR / VIP TOPTIPS:</b>\n"
-            "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
-            "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
-            f"📲 <i>Para unirte al VIP y recibir la combinada exclusiva de hoy, escríbeme:</i>\n"
-            f"👉 <b>Escribir al Analista: @{TELEGRAM_USERNAME}</b>"
-        )
+    msg = (
+        "☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip!</b> ☀️\n\n"
+        "☕ Arrancamos la jornada con informes de partidos, noticias y datos tácticos del día.\n\n"
+        "💳 <b>TARIFAS GRUPO VIP PRIVADO:</b>\n"
+        "🔥 <b>Pase Día Premium:</b> <b>5.00 €</b>\n"
+        "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
+        "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
+        f"📲 <i>Escríbeme por privado para acceder a la combinada exclusiva:</i>\n"
+        f"👉 <b>Contactar al Analista: @{TELEGRAM_USERNAME}</b>"
+    )
     
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Entrar al Grupo VIP", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
+            [{"text": "👑 Entrar al Grupo VIP", "url": f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"}]
         ]
     }
     send_telegram_message(msg, reply_markup=keyboard)
@@ -198,34 +212,28 @@ def send_daily_sales_message():
 def send_evening_recap():
     msg = (
         "📈 <b>CIERRE DE JORNADA Y BALANCE DE RESULTADOS</b> 📈\n\n"
-        "Finalizamos otro día aplicando nuestro método de análisis estadístico en @FreeTopTip.\n\n"
+        "Finalizamos otro día aplicando análisis estadístico e informes tácticos en @FreeTopTip.\n\n"
         f"📊 <b>ESTADÍSTICAS GENERALES DEL CANAL:</b>\n"
-        f"🟢 <b>Verdes / Aciertos:</b> {CHANNEL_STATS['wins']}\n"
+        f"🟢 <b>Aciertos:</b> {CHANNEL_STATS['wins']}\n"
         f"🔴 <b>Fallos:</b> {CHANNEL_STATS['losses']}\n"
-        f"💰 <b>Beneficio Neto:</b> +{CHANNEL_STATS['profit_units']} Unidades (+{CHANNEL_STATS.get('yield_pct', 24.5)}% Yield)\n\n"
+        f"💰 <b>Beneficio Neto:</b> +{CHANNEL_STATS['profit_units']} Unidades (+{CHANNEL_STATS['yield_pct']}% Yield)\n\n"
         f"👑 <b>¿Quieres asegurar tus ganancias diarias? Pasa al VIP: @{TELEGRAM_USERNAME}</b>"
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "💳 Unirme al VIP para Mañana", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
+            [{"text": "💳 Unirme al VIP para Mañana", "url": f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"}]
         ]
     }
     send_telegram_message(msg, reply_markup=keyboard)
 
-TODAY_MATCHES = [
-    ("Galatasaray vs FC Barcelona", "UEFA Champions League", "Crear Apuesta: Victoria FC Barcelona + Más de 8.5 Córneres + Ambos Anotan", 2.35),
-    ("Arsenal vs Lille", "UEFA Champions League", "Crear Apuesta: Victoria Arsenal + Más de 1.5 Goles + Más de 4.5 Córneres Arsenal", 2.10),
-    ("AZ Alkmaar vs FC Utrecht", "Eredivisie (Países Bajos)", "Más de 2.5 Goles Totales + Ambos Anotan (Sí)", 2.05),
-    ("Sporting CP vs SC Braga", "Primeira Liga (Portugal)", "Crear Apuesta: Victoria Sporting CP + Más de 1.5 Goles + Más de 7.5 Córneres", 2.15),
-    ("Boca Juniors vs River Plate", "Liga Profesional Argentina", "Más de 5.5 Tarjetas Totales + Doble Oportunidad Boca/Empate", 2.20)
-]
-
 def run_daily_routine():
+    logging.info("Ejecutando rutina noticiosa y de pronósticos estilo Scores24...")
     send_daily_sales_message()
-    time.sleep(3)
+    time.sleep(4)
     
-    for match, league, pick, odds in TODAY_MATCHES:
-        publish_pick(match, league, pick, odds)
+    picks = fetch_scores24_style_picks(count=4)
+    for item in picks:
+        publish_scores24_pick(item)
         time.sleep(8)
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -233,7 +241,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Gemini Dinámico Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster Scores24 Dinámico Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -244,9 +252,9 @@ def run_http_server():
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster Inteligente Gemini Dinámico en ejecución...")
+    logging.info("Servicio Tipster Inteligente en ejecución...")
 
-    # Ejecución inmediata nada más arrancar
+    # Publicación inmediata en el canal
     run_daily_routine()
 
     now_spain = datetime.now(SPAIN_TZ)
@@ -259,13 +267,11 @@ def main():
             current_day = now_spain.day
             current_hour = now_spain.hour
 
-            # Rutina diaria a las 08:00 AM
             if current_day != last_executed_day and current_hour == 8:
                 run_daily_routine()
                 last_executed_day = current_day
                 recap_sent_today = False
 
-            # Cierre diario a las 22:30 PM
             if current_hour == 22 and not recap_sent_today:
                 send_evening_recap()
                 recap_sent_today = True
