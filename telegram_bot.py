@@ -3,6 +3,7 @@ import time
 import logging
 import threading
 import requests
+import json
 import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -92,9 +93,9 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         return None
 
 def generate_gemini_expert_analysis(match_name, league, pick, odds):
-    """Utiliza Gemini para generar un análisis táctico en primera persona altamente profesional."""
+    """Genera un análisis técnico experto mediante la API de Gemini."""
     if not GEMINI_API_KEY:
-        return f"Analizando a fondo el contexto táctico de este choque de {league}, la dinámica de ambos planteles nos muestra una clara ventaja en la generación de ocasiones y control de partido. {match_name} presenta las condiciones perfectas para buscar esta selección a cuota {odds:.2f} en Bet365."
+        return f"Analizando a fondo el contexto táctico de este choque de {league}, la dinámica de ambos planteles refleja una clara ventaja en generación de ocasiones. {match_name} presenta las condiciones óptimas para buscar esta selección a cuota {odds:.2f} en Bet365."
     
     prompt = f"""
     Actúa como un tipster analista de fútbol profesional para el canal de Telegram @FreeTopTip.
@@ -128,4 +129,121 @@ def generate_gemini_expert_analysis(match_name, league, pick, odds):
         return f"Tras revisar las métricas clave y el contexto del encuentro en {league}, esta selección nos ofrece un valor diferencial excelente en Bet365."
 
 def publish_pick(match_title, league_name, pick_text, odds_val):
-    analysis_text = generate_gemini_expert_analysis(match_title, league_name, pick_
+    analysis_text = generate_gemini_expert_analysis(match_title, league_name, pick_text, odds_val)
+    
+    caption = (
+        f"⚽ <b>ANÁLISIS DE VALOR Y PRONÓSTICO - @FreeTopTip</b> ⚽\n\n"
+        f"🏆 <b>Competición:</b> {league_name}\n"
+        f"⚔️ <b>Encuentro:</b> {match_title}\n\n"
+        f"🎯 <b>SELECCIÓN RECOMENDADA (BET365):</b>\n"
+        f"• Pronóstico: <code>{pick_text}</code>\n"
+        f"• Cuota Real: <b>{odds_val:.2f}</b>\n"
+        f"• Stake Sugerido: <b>1.5 / 10</b>\n\n"
+        f"🔎 <b>MI ANÁLISIS DETALLADO DEL PARTIDO:</b>\n"
+        f"💬 {analysis_text}\n\n"
+        f"📊 <b>BALANCE DEL CANAL:</b> +{CHANNEL_STATS['profit_units']} Unidades de Beneficio\n\n"
+        f"💳 <b>¿QUIERES ACCEDER A TODAS LAS COMBINADAS VIP DE HOY?</b>\n"
+        f"📲 Escríbeme directamente por privado: <b>@{TELEGRAM_USERNAME}</b>"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "👑 Comprar Pase VIP / Contactar al Analista", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
+        ]
+    }
+
+    img_path = create_scores24_card(match_title, league_name, pick_text, odds_val)
+    sent = False
+    if img_path:
+        sent = send_telegram_photo(img_path, caption, reply_markup=keyboard)
+    if not sent:
+        send_telegram_message(caption, reply_markup=keyboard)
+
+def send_daily_sales_message():
+    now_spain = datetime.now(SPAIN_TZ)
+    weekday = now_spain.weekday()
+    
+    if weekday in [4, 5, 6]: # Viernes, Sábado, Domingo
+        msg = (
+            "☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip!</b> ☀️\n\n"
+            "☕ Arrancamos una jornada cargada de análisis en los mejores partidos del día.\n\n"
+            "💳 <b>TARIFAS GRUPO VIP PRIVADO:</b>\n"
+            "🔥 <b>Pase Día Premium:</b> <b>5.00 €</b>\n"
+            "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
+            "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
+            f"📲 <i>Escríbeme por privado para entrar al Grupo VIP:</i>\n"
+            f"👉 <b>Contactar al Analista: @{TELEGRAM_USERNAME}</b>"
+        )
+    else: # Lunes a Jueves
+        msg = (
+            "☀️ <b>¡BUENOS DÍAS A TODOS! JORNADA DE VALOR DE HOY</b> ☀️\n\n"
+            "☕ Ya tenemos filtrados los encuentros del día con mayor valor táctico.\n\n"
+            "💳 <b>ACCESO AL GRUPO VIP TOPTIPS:</b>\n"
+            "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
+            "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
+            f"📲 <i>Para unirte al VIP y recibir la combinada exclusiva de hoy, escríbeme:</i>\n"
+            f"👉 <b>Escribir al Analista: @{TELEGRAM_USERNAME}</b>"
+        )
+    
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "👑 Entrar al Grupo VIP", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
+        ]
+    }
+    send_telegram_message(msg, reply_markup=keyboard)
+
+TODAY_MATCHES = [
+    ("Galatasaray vs FC Barcelona", "UEFA Champions League", "Crear Apuesta: Victoria FC Barcelona + Más de 8.5 Córneres + Ambos Anotan", 2.35),
+    ("Arsenal vs Lille", "UEFA Champions League", "Crear Apuesta: Victoria Arsenal + Más de 1.5 Goles + Más de 4.5 Córneres Arsenal", 2.10),
+    ("AZ Alkmaar vs FC Utrecht", "Eredivisie (Países Bajos)", "Más de 2.5 Goles Totales + Ambos Anotan (Sí)", 2.05),
+    ("Sporting CP vs SC Braga", "Primeira Liga (Portugal)", "Crear Apuesta: Victoria Sporting CP + Más de 1.5 Goles + Más de 7.5 Córneres", 2.15),
+    ("Boca Juniors vs River Plate", "Liga Profesional Argentina", "Más de 5.5 Tarjetas Totales + Doble Oportunidad Boca/Empate", 2.20)
+]
+
+def run_daily_routine():
+    send_daily_sales_message()
+    time.sleep(3)
+    
+    for match, league, pick, odds in TODAY_MATCHES:
+        publish_pick(match, league, pick, odds)
+        time.sleep(4)
+
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html; charset=utf-8')
+        self.end_headers()
+        self.wfile.write("Bot Tipster Gemini Activo y Operativo".encode('utf-8'))
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 10000))
+    try:
+        HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler).serve_forever()
+    except Exception as e:
+        logging.error(f"Error servidor HTTP: {e}")
+
+def main():
+    threading.Thread(target=run_http_server, daemon=True).start()
+    logging.info("Servicio Tipster Inteligente Gemini en ejecución...")
+
+    run_daily_routine()
+
+    last_executed_day = -1
+
+    while True:
+        try:
+            now_spain = datetime.now(SPAIN_TZ)
+            current_day = now_spain.day
+            current_hour = now_spain.hour
+
+            if current_day != last_executed_day and current_hour == 8:
+                run_daily_routine()
+                last_executed_day = current_day
+
+        except Exception as e:
+            logging.error(f"Error en bucle principal: {e}")
+
+        time.sleep(30)
+
+if __name__ == "__main__":
+    main()
