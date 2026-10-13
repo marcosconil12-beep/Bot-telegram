@@ -35,12 +35,12 @@ CHANNEL_STATS = {
     "yield_pct": 28.5
 }
 
-# Base de datos rigurosa y verificada exclusivamente para los partidos de HOY (13 de Octubre de 2026)
-MATCHES_TODAY_13_OCT = [
+# Base de datos optimizada con partidos reales de la jornada de hoy (13 de Octubre de 2026)
+TODAY_MATCHES_POOL = [
     {
         "match": "España vs Italia",
         "league": "UEFA Nations League",
-        "analysis": "• Dinámica táctica: La Roja mantiene un promedio de posesión del 64% en su feudo, buscando superioridad por bandas.\n• Bloque rival: Italia propone un sistema ultracompacto en bloque bajo, priorizando el contragolpe.\n• Métrica Scores24: Se prevé un mínimo de 9.5 córneres totales según el volumen de centros laterales.",
+        "analysis": "• Dinámica táctica: La Roja mantiene un promedio de posesión del 64% en su feudo, buscando superioridad por bandas.\n• Bloque rival: Italia propone un sistema ultracompacto en bloque bajo, priorizando el contragolpe.\n• Métrica Scores24: Se prevé un volumen alto de saques de esquina según las estadísticas de centros al área.",
         "pick_main": "Crear Apuesta: España O Empate + Más de 7.5 Córneres",
         "odds_main": 2.15,
         "pick_alt": "España Más de 1.5 Goles",
@@ -139,7 +139,7 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
 
 def publish_scores24_report():
     logging.info("Seleccionando partido verificado de la jornada de hoy...")
-    item = random.choice(MATCHES_TODAY_13_OCT)
+    item = random.choice(TODAY_MATCHES_POOL)
 
     match_title = item.get("match")
     league_name = item.get("league")
@@ -212,11 +212,11 @@ def main():
 
     publish_scores24_report()
 
-    # Publicación periódica cada 15 minutos (900 segundos) de partidos de hoy
+    # Bucle continuo: Publica un nuevo informe estadístico completo cada 15 minutos (900 segundos)
     while True:
         try:
             time.sleep(900)
-            logging.info("Ejecutando nuevo ciclo de publicación de partidos de hoy...")
+            logging.info("Ejecutando nuevo ciclo de publicación en el canal...")
             publish_scores24_report()
         except Exception as e:
             logging.error(f"Error en bucle de publicación: {e}")
