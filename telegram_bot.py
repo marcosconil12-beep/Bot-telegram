@@ -182,9 +182,11 @@ def publish_scores24_report():
         f"📲 Escríbeme por privado: <b>@{TELEGRAM_USERNAME}</b>"
     )
 
+    # URL limpia y blindada para evitar cualquier error de puerto o formato
+    clean_url = f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Acceder al Grupo VIP / Contactar", "url": f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"}]
+            [{"text": "👑 Acceder al Grupo VIP / Contactar", "url": clean_url}]
         ]
     }
 
@@ -209,9 +211,10 @@ def send_daily_sales_message():
         f"📲 <i>Para unirte al VIP y recibir las combinadas diarias, escríbeme:</i>\n"
         f"👉 <b>Contactar al Analista: @{TELEGRAM_USERNAME}</b>"
     )
+    clean_url = f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Entrar al Grupo VIP", "url": f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"}]
+            [{"text": "👑 Entrar al Grupo VIP", "url": clean_url}]
         ]
     }
     send_telegram_message(msg, reply_markup=keyboard)
