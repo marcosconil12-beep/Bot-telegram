@@ -3,7 +3,7 @@ import time
 import logging
 import threading
 import requests
-import random
+import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from PIL import Image, ImageDraw
@@ -35,7 +35,6 @@ def send_telegram_message(text, reply_markup=None):
     chat = str(CHAT_ID).strip().replace('"', '').replace("'", "")
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     
-    import json
     payload = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
@@ -53,7 +52,6 @@ def send_telegram_photo(photo_path, caption, reply_markup=None):
     chat = str(CHAT_ID).strip().replace('"', '').replace("'", "")
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
     try:
-        import json
         with open(photo_path, 'rb') as photo:
             data = {"chat_id": chat, "caption": caption, "parse_mode": "HTML"}
             if reply_markup:
@@ -93,49 +91,59 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         logging.error(f"Error generando imagen: {e}")
         return None
 
-def generate_gemini_analysis(match_name, league, pick, odds):
-    """Genera un análisis experto utilizando la IA de Gemini."""
-    if not GEMINI_API_KEY:
-        return f"Analizando los patrones tácticos de {league}, la dinámica de ambos planteles refleja una clara superioridad en generación de ocasiones. {match_name} presenta las condiciones óptimas para buscar esta selección a cuota {odds:.2f} en Bet365."
+def fetch_daily_picks_from_gemini():
+    """Gemini selecciona los partidos reales de HOY y redacta el análisis detallado."""
+    now_spain = datetime.now(SPAIN_TZ)
+    date_today = now_spain.strftime("%Y-%m-%d")
     
     prompt = f"""
-    Actúa como un tipster analista de fútbol profesional para el canal de Telegram @FreeTopTip.
-    Redacta un análisis en primera persona (hablando yo como experto) muy detallado y técnico.
+    Eres un tipster profesional con acceso a datos analíticos avanzadas.
+    La fecha actual de hoy es {date_today}.
     
-    Partido: {match_name}
-    Competición: {league}
-    Pronóstico / Selección: {pick}
-    Cuota Bet365: {odds}
+    TAREA:
+    Genera 4 pronósticos deportivos para partidos de fútbol QUE SE JUEGUEN HOY ({date_today}).
+    Prioriza si hay Champions League, Europa League, Conference League o ligas de primera/segunda división de Europa, Sudamérica, Asia o Australia que jueguen HOY.
     
-    Requisitos:
-    - Habla en primera persona ("He analizado", "Viendo el volumen de disparos...", "Me inclino por...").
-    - Explica razones tácticas reales: intensidad en campo contrario, saques de esquina, faltas, transición ofensiva o volumen de xG.
-    - Longitud: 3 a 5 frases potentes y profesionales.
-    - No agregues saludos ni despedidas, únicamente el texto del análisis.
+    REQUISITOS OBLIGATORIOS PARA CADA PICK:
+    1. Para cada partido, crea una selección de valor con cuota 2.00 o superior en Bet365 (puedes usar BetBuilder / Crear Apuesta si lo ves necesario).
+    2. Redacta un análisis EN PRIMERA PERSONA ("He analizado...", "Viendo la tendencia de córneres...", "Me inclino por...") MUY DETALLADO.
+    3. Cita aspectos tácticos concretos: porcentaje de posesión, estilo de transiciones, promedio de faltas/tarjetas, saques de esquina o volumen de remates recibidos. Prohibido usar frases genéricas.
+    
+    FORMATO DE SALIDA (Responde ÚNICAMENTE con una lista JSON válida como esta, sin texto adicional ni bloques markdown markdown```json):
+    [
+      {{
+        "match": "Equipo A vs Equipo B",
+        "league": "Nombre de la Competición",
+        "pick": "Crear Apuesta: Victoria Equipo A + Más de 8.5 Córneres",
+        "odds": 2.15,
+        "analysis": "Explicación técnica detallada en primera persona con datos específicos del partido de hoy."
+      }}
+    ]
     """
-    
+
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=){GEMINI_API_KEY}"
         headers = {"Content-Type": "application/json"}
         payload = {
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }]
+            "contents": [{"parts": [{"text": prompt}]}]
         }
-        res = requests.post(url, headers=headers, json=payload, timeout=12)
+        res = requests.post(url, headers=headers, json=payload, timeout=20)
         data = res.json()
-        if "candidates" in data and len(data["candidates"]) > 0:
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        else:
-            logging.error(f"Respuesta inesperada de Gemini API: {data}")
-            return f"Tras revisar las estadísticas avanzadas y el volumen ofensivo en {league}, detectamos un valor claro en esta opción para {match_name} a cuota {odds:.2f}."
+        
+        raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        
+        # Limpiar etiquetas markdown si las incluye
+        if raw_text.startswith("```json"):
+            raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+        elif raw_text.startswith("```"):
+            raw_text = raw_text.replace("```", "").strip()
+            
+        return json.loads(raw_text)
     except Exception as e:
-        logging.error(f"Error llamando a la API de Gemini: {e}")
-        return f"Tras revisar las estadísticas avanzadas y el volumen ofensivo en {league}, detectamos un valor claro en esta opción para {match_name} a cuota {odds:.2f}."
+        logging.error(f"Error obteniendo partidos de hoy desde Gemini: {e}")
+        return []
 
-def publish_pick(match_title, league_name, pick_text, odds_val):
-    analysis_text = generate_gemini_analysis(match_title, league_name, pick_text, odds_val)
-    
+def publish_pick(match_title, league_name, pick_text, odds_val, analysis_text):
     caption = (
         f"⚽ <b>ANÁLISIS DE VALOR Y PRONÓSTICO - @FreeTopTip</b> ⚽\n\n"
         f"🏆 <b>Competición:</b> {league_name}\n"
@@ -147,7 +155,7 @@ def publish_pick(match_title, league_name, pick_text, odds_val):
         f"🔎 <b>MI ANÁLISIS DETALLADO DEL PARTIDO:</b>\n"
         f"💬 {analysis_text}\n\n"
         f"📊 <b>BALANCE DEL CANAL:</b> +{CHANNEL_STATS['profit_units']} Unidades de Beneficio\n\n"
-        f"💳 <b>¿QUIERES ACCEDER A TODAS LAS COMBINADAS VIP?</b>\n"
+        f"💳 <b>¿QUIERES ACCEDER A TODAS LAS COMBINADAS VIP DE HOY?</b>\n"
         f"📲 Escríbeme directamente por privado: <b>@{TELEGRAM_USERNAME}</b>"
     )
 
@@ -171,7 +179,7 @@ def send_daily_sales_message():
     if weekday in [4, 5, 6]: # Viernes, Sábado, Domingo
         msg = (
             "☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip!</b> ☀️\n\n"
-            "☕ Arrancamos una jornada cargada de análisis en ligas europeas, sudamericanas e internacionales.\n\n"
+            "☕ Arrancamos una jornada cargada de análisis en los mejores partidos del día.\n\n"
             "💳 <b>TARIFAS GRUPO VIP PRIVADO:</b>\n"
             "🔥 <b>Pase Día Premium:</b> <b>5.00 €</b>\n"
             "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
@@ -181,8 +189,8 @@ def send_daily_sales_message():
         )
     else: # Lunes a Jueves
         msg = (
-            "☀️ <b>¡BUENOS DÍAS A TODOS! JORNADA DE VALOR GLOBAL</b> ☀️\n\n"
-            "☕ Tenemos preparadas las mejores selecciones tras filtrar mercados de Champions, ligas sudamericanas y competiciones asiáticas.\n\n"
+            "☀️ <b>¡BUENOS DÍAS A TODOS! JORNADA DE VALOR DE HOY</b> ☀️\n\n"
+            "☕ Ya tenemos filtrados los encuentros del día con mayor valor táctico.\n\n"
             "💳 <b>ACCESO AL GRUPO VIP TOPTIPS:</b>\n"
             "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
             "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
@@ -197,36 +205,22 @@ def send_daily_sales_message():
     }
     send_telegram_message(msg, reply_markup=keyboard)
 
-ALL_GLOBAL_PICKS = [
-    # Champions / Europa League (BetBuilder)
-    ("Galatasaray vs FC Barcelona", "UEFA Champions League", "Crear Apuesta: Victoria FC Barcelona + Más de 8.5 Córneres + Ambos Anotan", 2.35),
-    ("Arsenal vs Lille", "UEFA Champions League", "Crear Apuesta: Victoria Arsenal + Más de 1.5 Goles + Más de 4.5 Córneres Arsenal", 2.10),
-    ("Athletic Club vs AS Roma", "UEFA Europa League", "Crear Apuesta: Doble Oportunidad Athletic/Empate + Más de 8.5 Córneres + Más de 4.5 Tarjetas", 2.25),
-    
-    # Ligas Menores Europeas
-    ("AZ Alkmaar vs FC Utrecht", "Eredivisie (Países Bajos)", "Más de 2.5 Goles Totales + Ambos Anotan (Sí)", 2.05),
-    ("Sporting CP vs SC Braga", "Primeira Liga (Portugal)", "Crear Apuesta: Victoria Sporting CP + Más de 1.5 Goles + Más de 7.5 Córneres", 2.15),
-    ("Bodø/Glimt vs Molde FK", "Eliteserien (Noruega)", "Ambos Anotan (Sí) + Más de 8.5 Córneres", 2.00),
-    
-    # Sudamérica
-    ("Boca Juniors vs River Plate", "Liga Profesional Argentina", "Más de 5.5 Tarjetas Totales + Doble Oportunidad Boca/Empate", 2.20),
-    ("Flamengo vs Palmeiras", "Brasileirão Serie A", "Ambos Anotan (Sí) + Más de 1.5 Goles Totales", 2.05),
-    ("Millonarios vs Atlético Nacional", "Liga BetPlay (Colombia)", "Más de 4.5 Tarjetas + Más de 7.5 Córneres", 2.10),
-    
-    # Asia y Australia
-    ("Al Hilal vs Al Nassr", "Saudi Pro League", "Crear Apuesta: Más de 2.5 Goles + Ambos Anotan + Más de 8.5 Córneres", 2.25),
-    ("Kawasaki Frontale vs Yokohama Marinos", "J1 League (Japón)", "Más de 2.5 Goles Totales", 2.00),
-    ("Sydney FC vs Melbourne Victory", "A-League (Australia)", "Crear Apuesta: Ambos Anotan + Más de 9.5 Córneres Totales", 2.15)
-]
-
 def run_daily_routine():
+    # 1. Enviar mensaje de ventas
     send_daily_sales_message()
     time.sleep(3)
     
-    selected_picks = random.sample(ALL_GLOBAL_PICKS, min(5, len(ALL_GLOBAL_PICKS)))
+    # 2. Consultar a Gemini por los partidos reales de hoy
+    picks = fetch_daily_picks_from_gemini()
     
-    for match, league, pick, odds in selected_picks:
-        publish_pick(match, league, pick, odds)
+    for item in picks:
+        match = item.get("match", "Partido de Hoy")
+        league = item.get("league", "Competición")
+        pick = item.get("pick", "Selección de Valor")
+        odds = float(item.get("odds", 2.00))
+        analysis = item.get("analysis", "Análisis táctico completo del encuentro de hoy.")
+        
+        publish_pick(match, league, pick, odds, analysis)
         time.sleep(4)
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -234,7 +228,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Inteligente Gemini Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster Inteligente Gemini Diario Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -247,6 +241,7 @@ def main():
     threading.Thread(target=run_http_server, daemon=True).start()
     logging.info("Servicio Tipster Inteligente Gemini en ejecución...")
 
+    # Ejecución inmediata al arrancar
     run_daily_routine()
 
     last_executed_day = -1
