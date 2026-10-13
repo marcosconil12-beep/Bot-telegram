@@ -8,7 +8,6 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from PIL import Image, ImageDraw
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from google import genai
 
 # Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,13 +19,6 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xw
 TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
-
-# Inicializar Cliente de Gemini con SDK Oficial
-try:
-    client = genai.Client(api_key=GEMINI_API_KEY)
-except Exception as e:
-    logging.error(f"Error inicializando cliente de Gemini: {e}")
-    client = None
 
 # Balance del Canal
 CHANNEL_STATS = {
@@ -100,7 +92,7 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         return None
 
 def generate_gemini_expert_analysis(match_name, league, pick, odds):
-    """Genera un análisis experto con el SDK oficial de Gemini."""
+    """Genera un análisis experto usando llamadas HTTP directas a la API de Gemini."""
     prompt = f"""
     Eres un analista táctico de fútbol profesional y tipster para el canal @FreeTopTip.
     Escribe un análisis MUY DETALLADO, EXTENSO Y ESPECÍFICO EN PRIMERA PERSONA ("He analizado", "Observando el planteamiento...", "Apuesto por...") para el partido: {match_name}.
@@ -124,18 +116,20 @@ def generate_gemini_expert_analysis(match_name, league, pick, odds):
     - No incluyas saludos ni despedidas.
     """
 
-    if client:
-        try:
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-            )
-            if response and response.text:
-                return response.text.strip()
-        except Exception as e:
-            logging.error(f"Error al llamar con SDK genai para {match_name}: {e}")
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        data = res.json()
+        if "candidates" in data and len(data["candidates"]) > 0:
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception as e:
+        logging.error(f"Error en llamada API Gemini HTTP para {match_name}: {e}")
 
-    # Argumentaciones detalladas e individualizadas de respaldo por partido
+    # Respuestas únicas de alta calidad en caso de contingencia por partido
     if "Galatasaray" in match_name:
         return (
             "Contexto ambiental en Estambul: El Galatasaray en el RAMS Park sale siempre a morder desde el primer minuto impulsado por su enfervorecida afición. Es un estadio que empuja al equipo local a asumir riesgos masivos y probar disparos lejanos, obligando al rival a replegarse en bloque bajo.\n\n"
@@ -252,7 +246,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Gemini SDK Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster Gemini HTTP Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
