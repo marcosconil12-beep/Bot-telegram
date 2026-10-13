@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from PIL import Image, ImageDraw
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Configuración de Logs detallada
+# Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def clean_env(var_name, default_val=""):
@@ -36,35 +36,41 @@ CHANNEL_STATS = {
 }
 
 def send_telegram_message(text, reply_markup=None):
-    if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
-        logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID.")
-        return None
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
     try:
-        res = requests.post(url, json=payload, timeout=10)
-        return res.json().get("ok")
+        res = requests.post(url, json=payload, timeout=15)
+        res_json = res.json()
+        if res_json.get("ok"):
+            logging.info("¡Mensaje de texto enviado con éxito a Telegram!")
+            return True
+        else:
+            logging.error(f"Telegram rechazó el mensaje: {res_json}")
+            return False
     except Exception as e:
-        logging.error(f"Error enviando mensaje: {e}")
-        return None
+        logging.error(f"Excepción al enviar mensaje: {e}")
+        return False
 
 def send_telegram_photo(photo_path, caption, reply_markup=None):
-    if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
-        logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID al enviar foto.")
-        return None
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
     try:
         with open(photo_path, 'rb') as photo:
             data = {"chat_id": CHAT_ID, "caption": caption, "parse_mode": "HTML"}
             if reply_markup:
                 data["reply_markup"] = json.dumps(reply_markup)
-            res = requests.post(url, data=data, files={"photo": photo}, timeout=15)
-            return res.json().get("ok")
+            res = requests.post(url, data=data, files={"photo": photo}, timeout=20)
+            res_json = res.json()
+            if res_json.get("ok"):
+                logging.info("¡Foto y análisis publicados con éxito en el canal!")
+                return True
+            else:
+                logging.error(f"Telegram rechazó la foto: {res_json}")
+                return False
     except Exception as e:
-        logging.error(f"Error enviando foto: {e}")
-        return None
+        logging.error(f"Excepción al enviar foto: {e}")
+        return False
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val):
     try:
@@ -99,15 +105,11 @@ def fetch_live_gemini_scores24():
     now_spain = datetime.now(SPAIN_TZ)
     date_today = now_spain.strftime("%d de %B de %Y")
     
-    logging.info(f"Consultando a Gemini partidos reales para HOY ({date_today})...")
-    
     prompt = f"""
     Actúa como analista estadístico experto de la plataforma Scores24.
     La fecha de HOY es estrictamente: {date_today}.
     
-    TAREA:
-    Busca y selecciona un partido de fútbol REAL que se dispute HOY ({date_today}) en cualquier liga del mundo (grandes ligas, ligas secundarias, latinoamericanas, copas o ligas menores). No uses partidos de otras fechas ni de temporadas pasadas.
-    
+    Selecciona un partido de fútbol REAL que se dispute HOY ({date_today}) en cualquier liga del mundo.
     Redacta un informe técnico y estadístico minucioso al estilo Scores24 que incluya:
     - Análisis de rendimiento y dinámicas recientes.
     - Pronóstico Principal en Bet365 con cuota >= 2.00.
@@ -129,7 +131,7 @@ def fetch_live_gemini_scores24():
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         headers = {"Content-Type": "application/json"}
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        res = requests.post(url, headers=headers, json=payload, timeout=15)
         data = res.json()
         if "candidates" in data and len(data["candidates"]) > 0:
             raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
@@ -137,14 +139,12 @@ def fetch_live_gemini_scores24():
                 raw_text = raw_text.replace("```json", "").replace("```", "").strip()
             elif raw_text.startswith("```"):
                 raw_text = raw_text.replace("```", "").strip()
-            logging.info("¡Datos de partidos de hoy obtenidos con éxito desde Gemini!")
             return json.loads(raw_text)
     except Exception as e:
-        logging.error(f"Error consultando partidos a Gemini: {e}")
+        logging.error(f"Error en Gemini: {e}")
     
-    logging.warning("Usando datos de respaldo de partidos de la jornada actual.")
     return {
-        "match": f"Partido Destacado en Directo ({now_spain.strftime('%d/%m')})",
+        "match": f"Encuentro en Directo de la Jornada ({now_spain.strftime('%d/%m')})",
         "league": "Liga Internacional Activa",
         "analysis": "Informe estadístico en curso:\n• Alta intensidad táctica en la medular.\n• Promedio de posesión equilibrado con llegadas constantes a área rival.\n• Tendencia a buscar superioridad numérica por bandas.",
         "pick_main": "Más de 2.5 Goles Totales + Ambos Anotan",
@@ -154,7 +154,7 @@ def fetch_live_gemini_scores24():
     }
 
 def publish_scores24_report():
-    logging.info("Iniciando creación de informe estadístico...")
+    logging.info("Generando informe estadístico...")
     item = fetch_live_gemini_scores24()
     
     match_title = item.get("match")
@@ -188,18 +188,14 @@ def publish_scores24_report():
         ]
     }
 
-    logging.info(f"Generando tarjeta gráfica para: {match_title}...")
     img_path = create_scores24_card(match_title, league_name, pick_main, odds_main)
     
     sent = False
     if img_path:
-        logging.info("Enviando foto y análisis al canal de Telegram...")
         sent = send_telegram_photo(img_path, caption, reply_markup=keyboard)
     if not sent:
-        logging.info("Enviando mensaje de texto de respaldo al canal...")
+        logging.info("Intentando enviar por texto plano...")
         send_telegram_message(caption, reply_markup=keyboard)
-    else:
-        logging.info("¡Informe publicado con éxito en el canal!")
 
 def send_daily_sales_message():
     now_spain = datetime.now(SPAIN_TZ)
@@ -219,7 +215,6 @@ def send_daily_sales_message():
         ]
     }
     send_telegram_message(msg, reply_markup=keyboard)
-    logging.info("Mensaje comercial de bienvenida publicado.")
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -239,18 +234,15 @@ def main():
     threading.Thread(target=run_http_server, daemon=True).start()
     logging.info("Servicio Bot Scores24 Pro iniciado correctamente.")
 
-    # Mensaje inicial de bienvenida al arrancar
     send_daily_sales_message()
     time.sleep(3)
 
-    # Publicación inmediata del primer informe estadístico del día
     publish_scores24_report()
 
-    # Bucle continuo: Publica un nuevo informe estadístico detallado cada 10 minutos (600 segundos)
     while True:
         try:
             time.sleep(600)
-            logging.info("Iniciando nuevo ciclo de publicación de informe estadístico...")
+            logging.info("Iniciando nuevo ciclo de publicación...")
             publish_scores24_report()
         except Exception as e:
             logging.error(f"Error en bucle de publicación: {e}")
