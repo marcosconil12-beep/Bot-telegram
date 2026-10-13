@@ -1,4 +1,4 @@
 requests
 Pillow
 feedparser
-google-generativeai
+google-genai
