@@ -23,9 +23,11 @@ def clean_env(var_name, default_val=""):
         val_str = val_str.replace(bad_char, '')
     return val_str.strip()
 
-TELEGRAM_BOT_TOKEN = clean_env("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN = clean_env("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 CHAT_ID = clean_env("TELEGRAM_CHAT_ID", "@FreeTopTip")
-RAPIDAPI_KEY = clean_env("RAPIDAPI_KEY", "")
+
+# Clave de RapidAPI inyectada directamente para evitar errores de lectura de entorno
+RAPIDAPI_KEY = clean_env("RAPIDAPI_KEY", "d6abc7c413mshf80c5e16b6760bcp14e3f9jsnf2c34103db6c")
 GEMINI_API_KEY = clean_env("GEMINI_API_KEY", "")
 TELEGRAM_USERNAME = "Mark122"
 
@@ -36,7 +38,7 @@ CHANNEL_STATS = {
     "yield_pct": 34.2
 }
 
-# Configuración del nuevo cliente oficial de Gemini
+# Configuración del cliente oficial de Gemini AI
 ai_client = None
 if GEMINI_API_KEY:
     try:
@@ -54,10 +56,6 @@ RSS_FEEDS = [
 
 def fetch_real_flashscore_events():
     """Obtiene únicamente partidos reales del día desde Flashscore"""
-    if not RAPIDAPI_KEY:
-        logging.warning("Falta la clave RAPIDAPI_KEY en las variables de Railway.")
-        return []
-
     url = "https://flashlive-sports.p.rapidapi.com/v1/events/list"
     headers = {
         "X-RapidAPI-Key": RAPIDAPI_KEY,
@@ -93,7 +91,7 @@ def fetch_real_flashscore_events():
                             "is_live": is_live
                         })
         
-        logging.info(f"Partidos reales encontrados en la API: {len(matches)}")
+        logging.info(f"¡ÉXITO! Partidos reales encontrados en Flashscore: {len(matches)}")
         return matches
     except Exception as e:
         logging.error(f"Error consultando la API de Flashscore: {e}")
@@ -109,7 +107,7 @@ def generate_deep_ai_analysis(match_info):
         return (
             f"🏆 <b>{league}</b>\n"
             f"⏰ <b>Hora:</b> {match_time} | ⚔️ <b>{match}</b>\n\n"
-            f"💡 <b>Análisis de Mark:</b> He analizado la dinámica reciente de ambos equipos. La necesidad de puntuar favorece un choque muy dinámico con opciones claras en ambas áreas.\n\n"
+            f"💡 <b>Análisis de Mark:</b> He analizado los registros recientes de ambos conjuntos. La necesidad de puntuar favorece un choque dinámico con opciones claras en ambas áreas.\n\n"
             f"🎯 <b>PICK OFICIAL:</b> <code>Ambos Equipos Anotan - SÍ</code>\n"
             f"💰 <b>Cuota:</b> 1.85 (Bet365)\n"
             f"📊 <b>Stake:</b> 2/10"
@@ -139,7 +137,7 @@ def generate_deep_ai_analysis(match_info):
         return (
             f"🏆 <b>{league}</b>\n"
             f"⏰ <b>Hora:</b> {match_time} | ⚔️ <b>{match}</b>\n\n"
-            f"💡 <b>Análisis de Mark:</b> Observo un desequilibrio claro en las transiciones defensivas. La racha realizadora de ambos conjuntos nos otorga valor en la línea de goles.\n\n"
+            f"💡 <b>Análisis de Mark:</b> Observo un desequilibrio en las transiciones defensivas. La racha realizadora de ambos cuadros nos otorga valor en la línea de goles.\n\n"
             f"🎯 <b>PICK OFICIAL:</b> <code>Más de 2.25 Goles Asiático</code>\n"
             f"💰 <b>Cuota:</b> 1.80\n"
             f"📊 <b>Stake:</b> 2/10"
