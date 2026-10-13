@@ -221,5 +221,5 @@ def main():
         except Exception as e:
             logging.error(f"Error en bucle de publicación: {e}")
 
-if __name__ ==- "__main__":
+if __name__ == "__main__":
     main()
