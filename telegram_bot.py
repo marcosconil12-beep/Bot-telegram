@@ -2,20 +2,19 @@ import os
 import time
 import logging
 import threading
+import json
 import urllib.request
 import urllib.parse
-import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from PIL import Image, ImageDraw
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Credenciales limpias y blindadas directamente en código
+# --- CREDENCIALES FIJAS Y CANAL OFICIAL ---
 TELEGRAM_BOT_TOKEN = "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c"
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+CHAT_ID = "@FreeTopTip"
 GEMINI_API_KEY = "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g"
 TELEGRAM_USERNAME = "Mark122"
 
@@ -43,36 +42,35 @@ def send_telegram_message(text, reply_markup=None, target_chat=None):
             res = json.loads(response.read().decode('utf-8'))
             return res.get("ok")
     except Exception as e:
-        logging.error(f"Error enviando mensaje con urllib: {e}")
+        logging.error(f"Error enviando mensaje: {e}")
         return None
 
 def send_telegram_photo(photo_path, caption, reply_markup=None, target_chat=None):
     chat = str(target_chat or CHAT_ID).strip()
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
     
-    # Método robusto para enviar foto por multipart usando urllib
     try:
         boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
         data_body = []
         
         data_body.append(f'--{boundary}'.encode('utf-8'))
-        data_body.append(f'Content-Disposition: form-data; name="chat_id"'.encode('utf-8'))
+        data_body.append(b'Content-Disposition: form-data; name="chat_id"')
         data_body.append(b'')
         data_body.append(chat.encode('utf-8'))
         
         data_body.append(f'--{boundary}'.encode('utf-8'))
-        data_body.append(f'Content-Disposition: form-data; name="caption"'.encode('utf-8'))
+        data_body.append(b'Content-Disposition: form-data; name="caption"')
         data_body.append(b'')
         data_body.append(caption.encode('utf-8'))
         
         data_body.append(f'--{boundary}'.encode('utf-8'))
-        data_body.append(f'Content-Disposition: form-data; name="parse_mode"'.encode('utf-8'))
+        data_body.append(b'Content-Disposition: form-data; name="parse_mode"')
         data_body.append(b'')
         data_body.append(b'HTML')
         
         if reply_markup:
             data_body.append(f'--{boundary}'.encode('utf-8'))
-            data_body.append(f'Content-Disposition: form-data; name="reply_markup"'.encode('utf-8'))
+            data_body.append(b'Content-Disposition: form-data; name="reply_markup"')
             data_body.append(b'')
             data_body.append(json.dumps(reply_markup).encode('utf-8'))
             
@@ -80,7 +78,7 @@ def send_telegram_photo(photo_path, caption, reply_markup=None, target_chat=None
             photo_bytes = f.read()
             
         data_body.append(f'--{boundary}'.encode('utf-8'))
-        data_body.append(f'Content-Disposition: form-data; name="photo"; filename="card.png"'.encode('utf-8'))
+        data_body.append(b'Content-Disposition: form-data; name="photo"; filename="card.png"')
         data_body.append(b'Content-Type: image/png')
         data_body.append(b'')
         data_body.append(photo_bytes)
@@ -99,8 +97,7 @@ def send_telegram_photo(photo_path, caption, reply_markup=None, target_chat=None
             res = json.loads(response.read().decode('utf-8'))
             return res.get("ok")
     except Exception as e:
-        logging.error(f"Error enviando foto con urllib: {e}")
-        # Si falla la foto por cualquier motivo, envía al menos el texto para no perder el pick
+        logging.error(f"Error enviando foto: {e}")
         return send_telegram_message(caption, reply_markup=reply_markup, target_chat=target_chat)
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val):
@@ -142,9 +139,9 @@ def fetch_dynamic_daily_picks(count=4):
     TAREA:
     Genera {count} partidos REALES que se disputen HOY ({date_today}) en cualquier competición del mundo.
     Para cada uno crea un pronóstico de valor en Bet365 a cuota >= 2.00 y redacta un análisis técnico dividido estrictamente en tres bloques:
-    1. Contexto ambiental en el estadio: Describe la presión de la afición y el ritmo de inicio.
-    2. Estructura táctica del rival: Explica la alineación, transiciones y espacios concedidos.
-    3. Relación Riesgo/Beneficio: Justifica el valor de la cuota.
+    1. Contexto ambiental en el estadio
+    2. Estructura táctica del rival
+    3. Relación Riesgo/Beneficio
     
     Devuelve ÚNICAMENTE un array JSON válido con este formato exacto:
     [
@@ -239,20 +236,6 @@ def send_evening_recap():
     }
     send_telegram_message(msg, reply_markup=keyboard)
 
-def publish_single_pick_now():
-    picks = fetch_dynamic_daily_picks(count=1)
-    if picks:
-        item = picks[0]
-        publish_pick(
-            item.get("match", "Partido de Hoy"),
-            item.get("league", "Competición"),
-            item.get("pick", "Selección de Valor"),
-            float(item.get("odds", 2.00)),
-            item.get("analysis", "Análisis en detalle.")
-        )
-        return True
-    return False
-
 def handle_telegram_updates():
     offset = 0
     while True:
@@ -272,33 +255,23 @@ def handle_telegram_updates():
                         if not text:
                             continue
                             
-                        if text == "/start" or text == "/help":
+                        if text in ["/start", "/help"]:
                             help_text = (
-                                "👋 <b>¡Hola Admin! Menú de Control del Bot TopTips:</b>\n\n"
-                                "• <b>/pick</b> ➔ Publica 1 pick nuevo con análisis en el canal ahora mismo.\n"
-                                "• <b>/ventas</b> ➔ Publica el mensaje comercial VIP en el canal.\n"
-                                "• <b>/balance</b> ➔ Publica el balance de aciertos y yield en el canal."
+                                "👋 <b>¡Hola Admin! Menú de Control:</b>\n\n"
+                                "• <b>/pick</b> ➔ Publica 1 pick analizado en el canal.\n"
+                                "• <b>/ventas</b> ➔ Publica el mensaje VIP.\n"
+                                "• <b>/balance</b> ➔ Publica el balance general."
                             )
                             send_telegram_message(help_text, target_chat=user_chat_id)
-                            
-                        elif text == "/pick":
-                            send_telegram_message("⏳ Generando pick con Gemini y publicando en el canal...", target_chat=user_chat_id)
-                            ok = publish_single_pick_now()
-                            if ok:
-                                send_telegram_message("✅ ¡Pick publicado con éxito en el canal!", target_chat=user_chat_id)
-                            else:
-                                send_telegram_message("❌ Error generando el pick. Inténtalo de nuevo.", target_chat=user_chat_id)
-                                
                         elif text == "/ventas":
                             send_daily_sales_message()
-                            send_telegram_message("✅ Mensaje de ventas publicado en el canal.", target_chat=user_chat_id)
-                            
+                            send_telegram_message("✅ Mensaje publicado.", target_chat=user_chat_id)
                         elif text == "/balance":
                             send_evening_recap()
-                            send_telegram_message("✅ Resumen y balance publicado en el canal.", target_chat=user_chat_id)
+                            send_telegram_message("✅ Balance publicado.", target_chat=user_chat_id)
 
         except Exception as e:
-            logging.error(f"Error en listener de Telegram con urllib: {e}")
+            logging.error(f"Error en listener: {e}")
             
         time.sleep(2)
 
@@ -323,7 +296,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Activo con urllib".encode('utf-8'))
+        self.wfile.write("Bot Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
