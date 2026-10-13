@@ -9,7 +9,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from PIL import Image, ImageDraw
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import google.generativeai as genai
+from google import genai
 
 # Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -36,15 +36,14 @@ CHANNEL_STATS = {
     "yield_pct": 34.2
 }
 
-# Configuración de Gemini AI
-ai_model = None
+# Configuración del nuevo cliente oficial de Gemini
+ai_client = None
 if GEMINI_API_KEY:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        ai_model = genai.GenerativeModel('gemini-1.5-flash')
-        logging.info("Gemini AI configurado correctamente.")
+        ai_client = genai.Client(api_key=GEMINI_API_KEY)
+        logging.info("Gemini AI (google-genai) configurado correctamente.")
     except Exception as e:
-        logging.error(f"Error inicializando Gemini: {e}")
+        logging.error(f"Error inicializando Gemini AI: {e}")
 
 # RSS de Noticias
 RSS_FEEDS = [
@@ -56,7 +55,7 @@ RSS_FEEDS = [
 def fetch_real_flashscore_events():
     """Obtiene únicamente partidos reales del día desde Flashscore"""
     if not RAPIDAPI_KEY:
-        logging.warning("Falta la clave RAPIDAPI_KEY en Railway.")
+        logging.warning("Falta la clave RAPIDAPI_KEY en las variables de Railway.")
         return []
 
     url = "https://flashlive-sports.p.rapidapi.com/v1/events/list"
@@ -106,11 +105,11 @@ def generate_deep_ai_analysis(match_info):
     match = match_info["match"]
     match_time = match_info["time"]
     
-    if not ai_model:
+    if not ai_client:
         return (
             f"🏆 <b>{league}</b>\n"
             f"⏰ <b>Hora:</b> {match_time} | ⚔️ <b>{match}</b>\n\n"
-            f"💡 <b>Análisis de Mark:</b> He analizado los últimos registros ofensivos de ambos equipos. La necesidad de puntuar favorece un encuentro abierto con constantes llegadas a las áreas.\n\n"
+            f"💡 <b>Análisis de Mark:</b> He analizado la dinámica reciente de ambos equipos. La necesidad de puntuar favorece un choque muy dinámico con opciones claras en ambas áreas.\n\n"
             f"🎯 <b>PICK OFICIAL:</b> <code>Ambos Equipos Anotan - SÍ</code>\n"
             f"💰 <b>Cuota:</b> 1.85 (Bet365)\n"
             f"📊 <b>Stake:</b> 2/10"
@@ -119,25 +118,28 @@ def generate_deep_ai_analysis(match_info):
     prompt = (
         f"Eres Mark, un afamado tipster profesional de apuestas deportivas en Telegram.\n"
         f"Analiza este partido real que se disputa HOY: {match} ({league}) a las {match_time}.\n\n"
-        f"Genera una respuesta profesional con este formato HTML estricto:\n\n"
+        f"Genera una respuesta profesional con este formato HTML estricto para Telegram:\n\n"
         f"🏆 <b>{league}</b>\n"
         f"⏰ <b>Hora:</b> {match_time} | ⚔️ <b>{match}</b>\n\n"
         f"💡 <b>Análisis de Mark:</b>\n"
-        f"[Escribe 2 párrafos breves en primera persona analizando la forma de ambos equipos, xG, tiros a puerta o aspectos tácticos reales].\n\n"
-        f"🎯 <b>PICK OFICIAL:</b> [Pon un mercado claro como 'Más de 2.5 Goles', 'Gana Local', 'Ambos Anotan', etc.]\n"
+        f"[Escribe 2 párrafos breves en primera persona analizando la racha de ambos equipos, xG, disparos o aspectos tácticos del encuentro].\n\n"
+        f"🎯 <b>PICK OFICIAL:</b> [Indica un mercado claro de Bet365, ej: 'Más de 2.5 Goles', 'Gana Local', 'Ambos Anotan', etc.]\n"
         f"💰 <b>Cuota:</b> [Cuota realista entre 1.70 y 2.25]\n"
         f"📊 <b>Stake recomendado:</b> [1/10 o 2/10]"
     )
 
     try:
-        response = ai_model.generate_content(prompt)
+        response = ai_client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt,
+        )
         return response.text.strip()
     except Exception as e:
         logging.error(f"Error con Gemini AI: {e}")
         return (
             f"🏆 <b>{league}</b>\n"
             f"⏰ <b>Hora:</b> {match_time} | ⚔️ <b>{match}</b>\n\n"
-            f"💡 <b>Análisis de Mark:</b> Tras revisar la tendencia del mercado en Bet365, observo valor en la línea de goles debido al rendimiento reciente en ataque de ambos cuadros.\n\n"
+            f"💡 <b>Análisis de Mark:</b> Observo un desequilibrio claro en las transiciones defensivas. La racha realizadora de ambos conjuntos nos otorga valor en la línea de goles.\n\n"
             f"🎯 <b>PICK OFICIAL:</b> <code>Más de 2.25 Goles Asiático</code>\n"
             f"💰 <b>Cuota:</b> 1.80\n"
             f"📊 <b>Stake:</b> 2/10"
@@ -165,7 +167,7 @@ def send_telegram_photo(photo_path, caption):
         return False
 
 def create_match_card(match_title, league_name):
-    """Genera la imagen del partido para la publicación"""
+    """Genera la tarjeta visual del partido"""
     try:
         img = Image.new('RGB', (1000, 500), color=(13, 27, 42))
         d = ImageDraw.Draw(img)
@@ -193,7 +195,7 @@ def publish_single_pick():
     matches = fetch_real_flashscore_events()
     
     if not matches:
-        logging.warning("No se recibieron partidos de Flashscore en este intento. Reintentando...")
+        logging.warning("No se recibieron partidos de Flashscore en este intento.")
         return
 
     selected = random.choice(matches)
@@ -237,7 +239,7 @@ def main():
     # Primera ejecución al arrancar
     publish_single_pick()
 
-    # Bucle que publica 1 partido individual analizado cada 4 horas
+    # Publica 1 partido individual analizado cada 4 horas
     while True:
         time.sleep(14400)
         publish_single_pick()
