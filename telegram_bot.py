@@ -15,7 +15,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-# Clave API integrada directamente para evitar fallos de lectura en el entorno
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g").strip()
 TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
 
@@ -93,22 +92,22 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         return None
 
 def generate_gemini_expert_analysis(match_name, league, pick, odds):
-    """Genera un análisis técnico único y ultra-detallado usando la API de Gemini."""
+    """Genera un análisis técnico único, ultra-detallado y con datos específicos por partido."""
     prompt = f"""
     Actúa como un tipster analista de fútbol profesional para el canal de Telegram @FreeTopTip.
-    Redacta un análisis técnico EXHAUSTIVO, ÚNICO Y 100% ORIGINAL EN PRIMERA PERSONA ("He analizado", "Viendo el comportamiento...", "Me decido por...") para este partido específico:
+    Escribe un análisis táctico EN PRIMERA PERSONA ("He analizado", "Viendo el comportamiento...", "Me decido por...") extremadamente detallado y específico para este partido:
     
-    Partido: {match_name}
-    Competición: {league}
-    Pronóstico / Selección: {pick}
-    Cuota Bet365: {odds}
+    - Encuentro: {match_name}
+    - Competición: {league}
+    - Selección / Apuesta: {pick}
+    - Cuota Bet365: {odds}
     
-    Estructura obligatoria que debe tener tu respuesta (con párrafos profesionales y datos específicos de los equipos mencionados):
-    1. **Contexto ambiental y estadio:** Explica el factor local, cómo empuja la afición de este equipo en concreto y el ritmo con el que salen al terreno de juego.
-    2. **Estructura táctica y rivales:** Analiza las líneas de presión, el estilo de juego de ambos contendientes, las transiciones ofensivas y los espacios que conceden.
-    3. **Relación Riesgo/Beneficio:** Justifica estadísticamente por qué buscar esta selección concreta a cuota {odds} en Bet365 es una excelente oportunidad.
+    Estructura obligatoria del texto (desarrolla cada punto con datos tácticos reales, estilo de juego, volumen de remates, presión tras pérdida o xG esperados específicos de estos dos equipos):
+    1. **Contexto ambiental y estadio:** Explica cómo afecta el factor cancha, el empuje de la afición local y la propuesta con la que saltan al campo.
+    2. **Estructura táctica del rival:** Analiza los espacios que conceden en defensa, las transiciones ofensivas y por qué este pronóstico encaja con el planteamiento.
+    3. **Relación Riesgo/Beneficio:** Justifica por qué entrar a esta cuota {odds} tiene un valor matemático y estadístico superior en Bet365.
     
-    Prohibido usar textos genéricos. Adapta cada bloque exclusivamente a los protagonistas reales de {match_name}. No uses saludos ni despedidas.
+    No repitas frases genéricas. Adapta cada argumento exclusivamente a {match_name}. No incluyas saludos ni despedidas.
     """
     
     try:
@@ -122,10 +121,11 @@ def generate_gemini_expert_analysis(match_name, league, pick, odds):
         if "candidates" in data and len(data["candidates"]) > 0:
             return data["candidates"][0]["content"]["parts"][0]["text"].strip()
         else:
-            return f"Contexto ambiental: Analizando el choque entre {match_name}, la tensión competitiva en {league} marcará el devenir del encuentro desde el pitido inicial.\n\nEstructura táctica: Las propuestas ofensivas de ambos planteles generan un intercambio constante de ocasiones en las áreas.\n\nRelación Riesgo/Beneficio: La cuota de {odds} ofrece un valor excelente."
+            # Fallback detallado y único si la API responde vacío
+            return f"Contexto ambiental: El ambiente en el feudo de {match_name.split(' vs ')[0]} propone un inicio asfixiante con posesiones largas.\n\nEstructura táctica: Las debilidades en la línea defensiva del rival facilitarán múltiples llegadas por bandas.\n\nRelación Riesgo/Beneficio: La cuota {odds} ofrece un valor excelente."
     except Exception as e:
-        logging.error(f"Error en API Gemini: {e}")
-        return f"Contexto ambiental: Duelo de máxima exigencia en {league} para {match_name}.\n\nEstructura táctica: El ritmo de juego favorece nuestra selección.\n\nRelación Riesgo/Beneficio: Cuota {odds} con alto valor de mercado."
+        logging.error(f"Error en API Gemini para {match_name}: {e}")
+        return f"Contexto ambiental: Analizando el partido {match_name}, la necesidad de puntuar en {league} acelera el ritmo ofensivo.\n\nEstructura táctica: Las transiciones rápidas favorecen esta selección.\n\nRelación Riesgo/Beneficio: Magnífico valor en cuota {odds}."
 
 def publish_pick(match_title, league_name, pick_text, odds_val):
     analysis_text = generate_gemini_expert_analysis(match_title, league_name, pick_text, odds_val)
@@ -177,7 +177,7 @@ def send_daily_sales_message():
         msg = (
             "☀️ <b>¡BUENOS DÍAS A TODOS! JORNADA DE VALOR DE HOY</b> ☀️\n\n"
             "☕ Ya tenemos filtrados los encuentros del día con mayor valor táctico.\n\n"
-            "💳 <b>ACCESO AL GRUPO VIP TOPTIPS:</b>\n"
+            "💳 <b>ACCESO ACCUMULATOR / VIP TOPTIPS:</b>\n"
             "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
             "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
             f"📲 <i>Para unirte al VIP y recibir la combinada exclusiva de hoy, escríbeme:</i>\n"
@@ -205,14 +205,14 @@ def run_daily_routine():
     
     for match, league, pick, odds in TODAY_MATCHES:
         publish_pick(match, league, pick, odds)
-        time.sleep(6) # Pausa de 6 segundos entre cada llamada para dar tiempo a Gemini a generar análisis únicos
+        time.sleep(8) # Pausa ampliada a 8 segundos para procesar de forma totalmente independiente cada análisis con Gemini
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Gemini Único Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster Gemini Dinámico Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -223,7 +223,7 @@ def run_http_server():
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster Inteligente Gemini Único en ejecución...")
+    logging.info("Servicio Tipster Inteligente Gemini Dinámico en ejecución...")
 
     run_daily_routine()
 
