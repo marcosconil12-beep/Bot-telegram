@@ -35,11 +35,9 @@ CHANNEL_STATS = {
     "yield_pct": 26.1
 }
 
-def send_telegram_message(text, reply_markup=None):
+def send_telegram_message(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
-    if reply_markup:
-        payload["reply_markup"] = json.dumps(reply_markup)
     try:
         res = requests.post(url, json=payload, timeout=15)
         res_json = res.json()
@@ -53,13 +51,11 @@ def send_telegram_message(text, reply_markup=None):
         logging.error(f"Excepción al enviar mensaje: {e}")
         return False
 
-def send_telegram_photo(photo_path, caption, reply_markup=None):
+def send_telegram_photo(photo_path, caption):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
     try:
         with open(photo_path, 'rb') as photo:
             data = {"chat_id": CHAT_ID, "caption": caption, "parse_mode": "HTML"}
-            if reply_markup:
-                data["reply_markup"] = json.dumps(reply_markup)
             res = requests.post(url, data=data, files={"photo": photo}, timeout=20)
             res_json = res.json()
             if res_json.get("ok"):
@@ -179,25 +175,17 @@ def publish_scores24_report():
         f"• Selección: <code>{pick_alt}</code> (@{odds_alt:.2f})\n\n"
         f"📈 <b>ESTADÍSTICAS DEL CANAL:</b> +{CHANNEL_STATS['profit_units']} Unidades ({CHANNEL_STATS['yield_pct']}% Yield)\n\n"
         f"💳 <b>¿QUIERES ACCEDER A LAS COMBINADAS VIP EXCLUSIVAS?</b>\n"
-        f"📲 Escríbeme por privado: <b>@{TELEGRAM_USERNAME}</b>"
+        f"📲 Escríbeme por privado: <a href='[https://t.me/](https://t.me/){TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a>"
     )
-
-    # URL limpia y blindada para evitar cualquier error de puerto o formato
-    clean_url = f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "👑 Acceder al Grupo VIP / Contactar", "url": clean_url}]
-        ]
-    }
 
     img_path = create_scores24_card(match_title, league_name, pick_main, odds_main)
     
     sent = False
     if img_path:
-        sent = send_telegram_photo(img_path, caption, reply_markup=keyboard)
+        sent = send_telegram_photo(img_path, caption)
     if not sent:
         logging.info("Intentando enviar por texto plano...")
-        send_telegram_message(caption, reply_markup=keyboard)
+        send_telegram_message(caption)
 
 def send_daily_sales_message():
     now_spain = datetime.now(SPAIN_TZ)
@@ -209,15 +197,9 @@ def send_daily_sales_message():
         "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
         "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
         f"📲 <i>Para unirte al VIP y recibir las combinadas diarias, escríbeme:</i>\n"
-        f"👉 <b>Contactar al Analista: @{TELEGRAM_USERNAME}</b>"
+        f"👉 <b>Contactar al Analista: <a href='[https://t.me/](https://t.me/){TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a></b>"
     )
-    clean_url = f"[https://t.me/](https://t.me/){TELEGRAM_USERNAME}"
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "👑 Entrar al Grupo VIP", "url": clean_url}]
-        ]
-    }
-    send_telegram_message(msg, reply_markup=keyboard)
+    send_telegram_message(msg)
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
