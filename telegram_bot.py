@@ -91,79 +91,58 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         logging.error(f"Error generando imagen: {e}")
         return None
 
-def generate_gemini_expert_analysis(match_name, league, pick, odds):
-    """Genera un análisis experto usando llamadas HTTP directas a la API de Gemini."""
+def fetch_today_picks_from_gemini():
+    """Gemini busca los partidos REALES de la jornada de hoy y devuelve los pronósticos y análisis estructurados."""
+    now_spain = datetime.now(SPAIN_TZ)
+    today_str = now_spain.strftime("%d de %B de %Y")
+    
     prompt = f"""
     Eres un analista táctico de fútbol profesional y tipster para el canal @FreeTopTip.
-    Escribe un análisis MUY DETALLADO, EXTENSO Y ESPECÍFICO EN PRIMERA PERSONA ("He analizado", "Observando el planteamiento...", "Apuesto por...") para el partido: {match_name}.
-
-    Datos del pronóstico:
-    - Competición: {league}
-    - Selección: {pick}
-    - Cuota en Bet365: {odds}
-
-    ESTRUCTURA OBLIGATORIA DEL ANÁLISIS:
+    Hoy es {today_str}.
     
-    Contexto ambiental en el estadio: Describe el estadio concreto de este partido, la presión de la afición local y cómo saldrá a morder el equipo desde el minuto 1.
-
-    Estructura táctica del rival: Explica la alineación o propuesta táctica de ambos clubes, los espacios que conceden en defensa, transiciones rápidas y volumen de faltas/córneres/disparos.
-
-    Relación Riesgo/Beneficio: Justifica estadísticamente por qué buscar esta selección concreta a cuota {odds} en Bet365 es de las mejores entradas de la jornada.
-
-    REGLAS ESTRICTAS:
-    - Usa nombres reales de jugadores, entrenadores o aspectos específicos de {match_name}.
-    - No uses plantillas genéricas ni repitas frases hechas.
-    - No incluyas saludos ni despedidas.
+    TAREA:
+    Identifica 4 partidos de fútbol REALES que se jueguen HOY ({today_str}) en cualquier liga o competición oficial del mundo (Champions League, ligas europeas, sudamericanas, selecciones o ligas menores).
+    
+    Para cada partido, genera un pronóstico a cuota >= 2.00 en Bet365 y un análisis extremadamente detallado.
+    
+    ESTRUCTURA OBLIGATORIA DEL ANÁLISIS DE CADA PARTIDO:
+    1. Contexto ambiental en el estadio: Describe la presión local, ambiente y cómo saldrá el equipo.
+    2. Estructura táctica del rival: Explica la propuesta de ambos clubes, espacios en defensa y volumen ofensivo.
+    3. Relación Riesgo/Beneficio: Justifica estadísticamente la cuota.
+    
+    Responde ÚNICAMENTE con una lista JSON válida en este formato exacto (sin etiquetas markdown ```json):
+    [
+      {{
+        "match": "Equipo A vs Equipo B",
+        "league": "Nombre de la Competición",
+        "pick": "Selección o Crear Apuesta recomendada",
+        "odds": 2.10,
+        "analysis": "Contexto ambiental en el estadio: ...\\n\\nEstructura táctica del rival: ...\\n\\nRelación Riesgo/Beneficio: ..."
+      }}
+    ]
     """
 
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=){GEMINI_API_KEY}"
         headers = {"Content-Type": "application/json"}
         payload = {
             "contents": [{"parts": [{"text": prompt}]}]
         }
-        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        res = requests.post(url, headers=headers, json=payload, timeout=30)
         data = res.json()
         if "candidates" in data and len(data["candidates"]) > 0:
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            text_res = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if text_res.startswith("```json"):
+                text_res = text_res.replace("```json", "").replace("```", "").strip()
+            elif text_res.startswith("```"):
+                text_res = text_res.replace("```", "").strip()
+            return json.loads(text_res)
     except Exception as e:
-        logging.error(f"Error en llamada API Gemini HTTP para {match_name}: {e}")
-
-    # Respuestas únicas de alta calidad en caso de contingencia por partido
-    if "Galatasaray" in match_name:
-        return (
-            "Contexto ambiental en Estambul: El Galatasaray en el RAMS Park sale siempre a morder desde el primer minuto impulsado por su enfervorecida afición. Es un estadio que empuja al equipo local a asumir riesgos masivos y probar disparos lejanos, obligando al rival a replegarse en bloque bajo.\n\n"
-            "Estructura táctica del rival: Aunque el FC Barcelona parte como favorito y controlará gran parte de la posesión, su propuesta adelantada concede transiciones rápidas. El Galatasaray cuenta con extremos verticales que fuerzan continuos saques de esquina y duelos individuales en bandas.\n\n"
-            "Relación Riesgo/Beneficio: Combinar la victoria azulgrana con más córneres y goles a cuota 2.35 en Bet365 ofrece una relación estadística excelente frente al riesgo asumido."
-        )
-    elif "Arsenal" in match_name:
-        return (
-            "Contexto ambiental en Londres: El Emirates Stadium se convierte en una auténtica caldera en las grandes noches de Champions League. La presión asfixiante tras pérdida ahoga la salida de balón del visitante desde la medular.\n\n"
-            "Estructura táctica del rival: El Lille suele plantear un bloque defensivo compacto pero sufre de manera crónica en la defensa de los centros laterales y jugadas a balón parado perfiladas por los carrileros gunners.\n\n"
-            "Relación Riesgo/Beneficio: Exigir la victoria del Arsenal con más de 1.5 goles y volumen de saques de esquina a cuota 2.10 representa un valor de mercado sumamente rentable."
-        )
-    elif "AZ Alkmaar" in match_name:
-        return (
-            "Contexto ambiental en Alkmaar: El AFAS Stadion acoge un choque de ida y vuelta donde el dinamismo de la Eredivisie premia los planteamientos valientes y el intercambio constante de golpes.\n\n"
-            "Estructura táctica del rival: Tanto el AZ como el FC Utrecht promedian registros ofensivos muy elevados, dejando espacios evidentes a la espalda de sus laterales que facilitan transiciones claras hacia ambas porterías.\n\n"
-            "Relación Riesgo/Beneficio: Buscar que ambos anotan y la línea de más de 2.5 goles a cuota 2.05 es estadísticamente una de las opciones más fiables de la jornada."
-        )
-    elif "Sporting" in match_name:
-        return (
-            "Contexto ambiental en Lisboa: El Estádio José Alvalade empuja al Sporting CP a volcarse en campo contrario con un caudal ofensivo incesante sostenido por su línea de mediapuntas.\n\n"
-            "Estructura táctica del rival: El SC Braga concede ventajas considerables en los duelos individuales por los costados, lo que propiciará un alto volumen de llegadas a línea de fondo y saques de esquina.\n\n"
-            "Relación Riesgo/Beneficio: La victoria del equipo local acompañada de córneres y goles a cuota 2.15 refleja un margen matemático de acierto muy superior al de las cuotas directas."
-        )
-    else:
-        return (
-            "Contexto ambiental en Buenos Aires: El ambiente en La Bombonera genera un voltaje competitivo absoluto, con entradas duras y un clima de máxima tensión en cada disputa dividida.\n\n"
-            "Estructura táctica del rival: Los duelos de máxima rivalidad entre Boca Juniors y River Plate se deciden por detalles en la medular, propiciando un alto índice de faltas tácticas y amonestaciones tempranas.\n\n"
-            "Relación Riesgo/Beneficio: Apostar por el mercado de tarjetas y doble oportunidad a cuota 2.20 es una alternativa de valor excelentemente calibrada para este perfil de encuentro."
-        )
-
-def publish_pick(match_title, league_name, pick_text, odds_val):
-    analysis_text = generate_gemini_expert_analysis(match_title, league_name, pick_text, odds_val)
+        logging.error(f"Error generando picks de hoy con Gemini: {e}")
     
+    return []
+
+def publish_pick(match_title, league_name, pick_text, odds_val, analysis_text):
     caption = (
         f"⚽ <b>ANÁLISIS DE VALOR Y PRONÓSTICO - @FreeTopTip</b> ⚽\n\n"
         f"🏆 <b>Competición:</b> {league_name}\n"
@@ -225,20 +204,20 @@ def send_daily_sales_message():
     }
     send_telegram_message(msg, reply_markup=keyboard)
 
-TODAY_MATCHES = [
-    ("Galatasaray vs FC Barcelona", "UEFA Champions League", "Crear Apuesta: Victoria FC Barcelona + Más de 8.5 Córneres + Ambos Anotan", 2.35),
-    ("Arsenal vs Lille", "UEFA Champions League", "Crear Apuesta: Victoria Arsenal + Más de 1.5 Goles + Más de 4.5 Córneres Arsenal", 2.10),
-    ("AZ Alkmaar vs FC Utrecht", "Eredivisie (Países Bajos)", "Más de 2.5 Goles Totales + Ambos Anotan (Sí)", 2.05),
-    ("Sporting CP vs SC Braga", "Primeira Liga (Portugal)", "Crear Apuesta: Victoria Sporting CP + Más de 1.5 Goles + Más de 7.5 Córneres", 2.15),
-    ("Boca Juniors vs River Plate", "Liga Profesional Argentina", "Más de 5.5 Tarjetas Totales + Doble Oportunidad Boca/Empate", 2.20)
-]
-
 def run_daily_routine():
     send_daily_sales_message()
     time.sleep(3)
     
-    for match, league, pick, odds in TODAY_MATCHES:
-        publish_pick(match, league, pick, odds)
+    today_picks = fetch_today_picks_from_gemini()
+    
+    for pick_item in today_picks:
+        match = pick_item.get("match", "Partido de Hoy")
+        league = pick_item.get("league", "Competición")
+        pick = pick_item.get("pick", "Selección Recomendada")
+        odds = float(pick_item.get("odds", 2.00))
+        analysis = pick_item.get("analysis", "Análisis detallado en preparación.")
+        
+        publish_pick(match, league, pick, odds, analysis)
         time.sleep(6)
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -246,7 +225,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Gemini HTTP Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster 100% Dinámico Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -257,7 +236,7 @@ def run_http_server():
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster Inteligente Gemini en ejecución...")
+    logging.info("Servicio Tipster Inteligente Gemini Diario en ejecución...")
 
     run_daily_routine()
 
