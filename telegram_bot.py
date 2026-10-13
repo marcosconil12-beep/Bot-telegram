@@ -12,14 +12,15 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Variables de entorno
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g").strip()
+# Credenciales y Variables de Entorno
+TELEGRAM_BOT_TOKEN = "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c"
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
+GEMINI_API_KEY = "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g"
 TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
+# Balance del Canal
 CHANNEL_STATS = {
     "wins": 65,
     "losses": 14,
@@ -31,9 +32,8 @@ def send_telegram_message(text, reply_markup=None, target_chat=None):
     if not TELEGRAM_BOT_TOKEN:
         logging.error("Falta TELEGRAM_BOT_TOKEN.")
         return None
-    token = str(TELEGRAM_BOT_TOKEN).strip().replace('"', '').replace("'", "")
-    chat = str(target_chat or CHAT_ID).strip().replace('"', '').replace("'", "")
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    chat = str(target_chat or CHAT_ID)
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     
     payload = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
     if reply_markup:
@@ -48,9 +48,8 @@ def send_telegram_message(text, reply_markup=None, target_chat=None):
 def send_telegram_photo(photo_path, caption, reply_markup=None, target_chat=None):
     if not TELEGRAM_BOT_TOKEN:
         return None
-    token = str(TELEGRAM_BOT_TOKEN).strip().replace('"', '').replace("'", "")
-    chat = str(target_chat or CHAT_ID).strip().replace('"', '').replace("'", "")
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    chat = str(target_chat or CHAT_ID)
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
     try:
         with open(photo_path, 'rb') as photo:
             data = {"chat_id": chat, "caption": caption, "parse_mode": "HTML"}
@@ -67,20 +66,25 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         img = Image.new('RGB', (1000, 600), color=(13, 27, 42))
         d = ImageDraw.Draw(img)
         
+        # Marco y fondo
         d.rectangle([20, 20, 980, 580], outline=(0, 212, 170), width=4)
         d.rectangle([20, 20, 980, 110], fill=(20, 40, 65))
         
+        # Cabecera
         d.text((40, 48), "🛡️ TOPTIPS OFFICIAL ANALYTICS", fill=(0, 212, 170))
         d.text((580, 48), league_name.upper()[:25], fill=(200, 200, 200))
         
+        # Partido
         d.text((40, 140), "PARTIDO ANALIZADO EN DETALLE:", fill=(150, 160, 180))
         d.text((40, 180), match_title, fill=(255, 255, 255))
         
+        # Pronóstico
         d.rectangle([40, 240, 960, 420], fill=(24, 43, 73), outline=(255, 215, 0), width=2)
         d.text((70, 260), "SELECCIÓN RECOMENDADA (BET365):", fill=(255, 215, 0))
         d.text((70, 315), f"{pick_text[:45]}...", fill=(255, 255, 255))
         d.text((750, 315), f"@{odds_val:.2f}", fill=(0, 212, 170))
 
+        # Pie
         d.text((40, 460), f"📊 Métricas: Rendimiento Táctico | Yield: +{CHANNEL_STATS['profit_units']}U", fill=(150, 160, 180))
         d.text((40, 510), f"Canal Oficial: @FreeTopTip | Suscripción VIP: @{TELEGRAM_USERNAME}", fill=(255, 215, 0))
         
@@ -91,18 +95,20 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         logging.error(f"Error generando imagen: {e}")
         return None
 
-def fetch_dynamic_daily_picks(count=1):
+def fetch_dynamic_daily_picks(count=4):
+    """Genera partidos y análisis profundos llamando a Gemini."""
     now_spain = datetime.now(SPAIN_TZ)
     date_today = now_spain.strftime("%d de %B de %Y")
     
     prompt = f"""
-    Eres un analista táctico de fútbol profesional. Hoy es {date_today}.
+    Eres un analista táctico de fútbol profesional y tipster para el canal @FreeTopTip. Hoy es {date_today}.
     
-    Genera {count} partido(s) REAL(ES) que se juegue(n) HOY ({date_today}) en cualquier liga del mundo (grandes ligas, ligas secundarias o sudamericanas).
-    Para cada partido crea una selección Bet365 a cuota >= 2.00 y redacta un análisis técnico dividido estrictamente en tres bloques:
-    1. Contexto ambiental en el estadio
-    2. Estructura táctica del rival
-    3. Relación Riesgo/Beneficio
+    TAREA:
+    Genera {count} partidos REALES que se disputen HOY ({date_today}) en cualquier competición del mundo (grandes ligas, ligas secundarias o sudamericanas).
+    Para cada uno crea un pronóstico de valor en Bet365 a cuota >= 2.00 y redacta un análisis técnico dividido estrictamente en tres bloques:
+    1. Contexto ambiental en el estadio: Describe la presión de la afición y el ritmo de inicio.
+    2. Estructura táctica del rival: Explica la alineación, transiciones y espacios concedidos.
+    3. Relación Riesgo/Beneficio: Justifica el valor de la cuota.
     
     Devuelve ÚNICAMENTE un array JSON válido con este formato exacto:
     [
@@ -228,14 +234,10 @@ def publish_single_pick_now():
     return False
 
 def handle_telegram_updates():
-    if not TELEGRAM_BOT_TOKEN:
-        return
-    token = str(TELEGRAM_BOT_TOKEN).strip().replace('"', '').replace("'", "")
     offset = 0
-    
     while True:
         try:
-            url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){token}/getUpdates?offset={offset}&timeout=20"
+            url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){TELEGRAM_BOT_TOKEN}/getUpdates?offset={offset}&timeout=20"
             res = requests.get(url, timeout=25)
             data = res.json()
             
@@ -280,9 +282,14 @@ def handle_telegram_updates():
         time.sleep(2)
 
 def run_daily_routine():
-    send_daily_sales_message()
-    time.sleep(3)
+    """Lanza la rutina de publicaciones en el canal de Telegram."""
+    logging.info("Iniciando rutina completa de publicaciones...")
     
+    # 1. Mensaje de ventas
+    send_daily_sales_message()
+    time.sleep(4)
+    
+    # 2. Publicar 4 picks dinámicos del día
     picks = fetch_dynamic_daily_picks(count=4)
     for item in picks:
         publish_pick(
@@ -299,7 +306,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Interactivo Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster Estratégico e Inmediato Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -311,11 +318,13 @@ def run_http_server():
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
     threading.Thread(target=handle_telegram_updates, daemon=True).start()
-    logging.info("Servicio Tipster Inteligente e Interactivo en ejecución...")
+    logging.info("Servicio Tipster en ejecución...")
 
+    # PUBLICACIÓN INMEDIATA HOY NADA MÁS ARRANCAR
     run_daily_routine()
 
-    last_executed_day = -1
+    now_spain = datetime.now(SPAIN_TZ)
+    last_executed_day = now_spain.day
     recap_sent_today = False
 
     while True:
@@ -324,11 +333,13 @@ def main():
             current_day = now_spain.day
             current_hour = now_spain.hour
 
+            # A partir de mañana se ejecutará cada día a las 08:00 AM
             if current_day != last_executed_day and current_hour == 8:
                 run_daily_routine()
                 last_executed_day = current_day
                 recap_sent_today = False
 
+            # Publicación automática del balance diario a las 22:30 PM
             if current_hour == 22 and not recap_sent_today:
                 send_evening_recap()
                 recap_sent_today = True
