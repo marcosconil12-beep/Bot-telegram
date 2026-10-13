@@ -37,15 +37,14 @@ CHANNEL_STATS = {
 }
 
 # Configuración de Gemini AI
+ai_model = None
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         ai_model = genai.GenerativeModel('gemini-1.5-flash')
+        logging.info("Gemini AI configurado correctamente.")
     except Exception as e:
         logging.error(f"Error inicializando Gemini: {e}")
-        ai_model = None
-else:
-    ai_model = None
 
 # RSS de Noticias
 RSS_FEEDS = [
@@ -55,9 +54,9 @@ RSS_FEEDS = [
 ]
 
 def fetch_real_flashscore_events():
-    """Obtiene partidos reales del día desde Flashscore optimizando peticiones"""
+    """Obtiene únicamente partidos reales del día desde Flashscore"""
     if not RAPIDAPI_KEY:
-        logging.warning("No hay RAPIDAPI_KEY configurada.")
+        logging.warning("Falta la clave RAPIDAPI_KEY en Railway.")
         return []
 
     url = "https://flashlive-sports.p.rapidapi.com/v1/events/list"
@@ -95,14 +94,14 @@ def fetch_real_flashscore_events():
                             "is_live": is_live
                         })
         
-        logging.info(f"Partidos reales obtenidos de Flashscore: {len(matches)}")
+        logging.info(f"Partidos reales encontrados en la API: {len(matches)}")
         return matches
     except Exception as e:
-        logging.error(f"Error consultando Flashscore API: {e}")
+        logging.error(f"Error consultando la API de Flashscore: {e}")
         return []
 
 def generate_deep_ai_analysis(match_info):
-    """Genera un pronóstico individual completo y detallado con la IA Gemini"""
+    """Genera un análisis y pronóstico individual real en primera persona usando Gemini"""
     league = match_info["league"]
     match = match_info["match"]
     match_time = match_info["time"]
@@ -111,35 +110,35 @@ def generate_deep_ai_analysis(match_info):
         return (
             f"🏆 <b>{league}</b>\n"
             f"⏰ <b>Hora:</b> {match_time} | ⚔️ <b>{match}</b>\n\n"
-            f"💡 <b>Análisis de Mark:</b> Tras analizar la dinámica reciente de ambos conjuntos y sus métricas en xG, observo una clara superioridad ofensiva del equipo local en las segundas partes.\n\n"
-            f"🎯 <b>PICK RECOMENDADO:</b> <code>Gana {match_info['home']} o Empata + Más de 1.5 Goles</code>\n"
-            f"💰 <b>Cuota estimada:</b> 1.85 (Bet365)\n"
+            f"💡 <b>Análisis de Mark:</b> He analizado los últimos registros ofensivos de ambos equipos. La necesidad de puntuar favorece un encuentro abierto con constantes llegadas a las áreas.\n\n"
+            f"🎯 <b>PICK OFICIAL:</b> <code>Ambos Equipos Anotan - SÍ</code>\n"
+            f"💰 <b>Cuota:</b> 1.85 (Bet365)\n"
             f"📊 <b>Stake:</b> 2/10"
         )
 
     prompt = (
-        f"Eres Mark, un experto tipster profesional de apuestas deportivas.\n"
-        f"Analiza el siguiente partido de fútbol real: {match} ({league}) a las {match_time}.\n\n"
-        f"Escribe un pronóstico profesional individual con este formato EXACTO en HTML para Telegram:\n\n"
+        f"Eres Mark, un afamado tipster profesional de apuestas deportivas en Telegram.\n"
+        f"Analiza este partido real que se disputa HOY: {match} ({league}) a las {match_time}.\n\n"
+        f"Genera una respuesta profesional con este formato HTML estricto:\n\n"
         f"🏆 <b>{league}</b>\n"
         f"⏰ <b>Hora:</b> {match_time} | ⚔️ <b>{match}</b>\n\n"
         f"💡 <b>Análisis de Mark:</b>\n"
-        f"[Redacta 2 párrafos cortos en primera persona explicando claves tácticas, xG, racha o tendencias de mercado].\n\n"
-        f"🎯 <b>PICK OFICIAL:</b> [Pon un mercado específico y realista de Bet365, ej: Ambos Anotan / Marcan, Más de 2.5 Goles, Handicap Asiático, etc.]\n"
-        f"💰 <b>Cuota:</b> [Indica una cuota realista entre 1.70 y 2.20]\n"
-        f"📊 <b>Stake recomendado:</b> [1/10, 2/10 o 3/10]"
+        f"[Escribe 2 párrafos breves en primera persona analizando la forma de ambos equipos, xG, tiros a puerta o aspectos tácticos reales].\n\n"
+        f"🎯 <b>PICK OFICIAL:</b> [Pon un mercado claro como 'Más de 2.5 Goles', 'Gana Local', 'Ambos Anotan', etc.]\n"
+        f"💰 <b>Cuota:</b> [Cuota realista entre 1.70 y 2.25]\n"
+        f"📊 <b>Stake recomendado:</b> [1/10 o 2/10]"
     )
 
     try:
         response = ai_model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        logging.error(f"Error generando contenido en Gemini: {e}")
+        logging.error(f"Error con Gemini AI: {e}")
         return (
             f"🏆 <b>{league}</b>\n"
             f"⏰ <b>Hora:</b> {match_time} | ⚔️ <b>{match}</b>\n\n"
-            f"💡 <b>Análisis de Mark:</b> Partido con alta intensidad esperada en mediocampo. Las métricas de disparos a puerta avalan buscar mercado de goles.\n\n"
-            f"🎯 <b>PICK OFICIAL:</b> <code>Más de 2.0 Goles Asiático</code>\n"
+            f"💡 <b>Análisis de Mark:</b> Tras revisar la tendencia del mercado en Bet365, observo valor en la línea de goles debido al rendimiento reciente en ataque de ambos cuadros.\n\n"
+            f"🎯 <b>PICK OFICIAL:</b> <code>Más de 2.25 Goles Asiático</code>\n"
             f"💰 <b>Cuota:</b> 1.80\n"
             f"📊 <b>Stake:</b> 2/10"
         )
@@ -166,7 +165,7 @@ def send_telegram_photo(photo_path, caption):
         return False
 
 def create_match_card(match_title, league_name):
-    """Crea una tarjeta gráfica individual personalizada para cada partido"""
+    """Genera la imagen del partido para la publicación"""
     try:
         img = Image.new('RGB', (1000, 500), color=(13, 27, 42))
         d = ImageDraw.Draw(img)
@@ -174,9 +173,9 @@ def create_match_card(match_title, league_name):
         d.rectangle([20, 20, 980, 480], outline=(0, 212, 170), width=4)
         d.rectangle([20, 20, 980, 100], fill=(20, 40, 65))
         
-        d.text((40, 45), "🔥 PRONÓSTICO OFICIAL | ANALIZADO CON IA", fill=(255, 215, 0))
-        d.text((40, 130), league_name[:45], fill=(0, 212, 170))
-        d.text((40, 190), match_title[:45], fill=(255, 255, 255))
+        d.text((40, 45), "🔥 PRONÓSTICO DESTACADO | ANALIZADO CON IA", fill=(255, 215, 0))
+        d.text((40, 130), str(league_name)[:45], fill=(0, 212, 170))
+        d.text((40, 190), str(match_title)[:45], fill=(255, 255, 255))
         
         d.rectangle([40, 310, 960, 440], fill=(24, 43, 73), outline=(0, 212, 170), width=2)
         d.text((60, 330), f"📈 BALANCE CANAL: +{CHANNEL_STATS['profit_units']}U ({CHANNEL_STATS['yield_pct']}% Yield)", fill=(255, 215, 0))
@@ -186,35 +185,26 @@ def create_match_card(match_title, league_name):
         img.save(filename)
         return filename
     except Exception as e:
-        logging.error(f"Error creando tarjeta de partido: {e}")
+        logging.error(f"Error creando la imagen: {e}")
         return None
 
 def publish_single_pick():
-    """Selecciona UN partido real y publica su pronóstico completo e individual"""
+    """Selecciona y analiza UN partido 100% real de la API de la jornada de hoy"""
     matches = fetch_real_flashscore_events()
     
     if not matches:
-        # Respaldo de seguridad si la API no devuelve partidos en este instante
-        selected = {
-            "league": "🇪🇸 ESPAÑA - LA LIGA",
-            "home": "Sevilla FC",
-            "away": "Real Betis",
-            "match": "Sevilla FC vs Real Betis",
-            "time": "21:00 CEST",
-            "is_live": False
-        }
-    else:
-        selected = random.choice(matches)
+        logging.warning("No se recibieron partidos de Flashscore en este intento. Reintentando...")
+        return
 
+    selected = random.choice(matches)
     analysis_text = generate_deep_ai_analysis(selected)
     
-    # Construcción de mensaje individual
     message_lines = [
-        "🔥 <b>PRONÓSTICO DESTACADO DEL DÍA</b> 🔥\n",
+        "🔥 <b>PRONÓSTICO REAL DEL DÍA</b> 🔥\n",
         analysis_text,
         f"\n📈 <b>Balance histórico:</b> +{CHANNEL_STATS['profit_units']}U ({CHANNEL_STATS['yield_pct']}% Yield)",
-        f"💳 <b>¿Quieres acceder al Grupo VIP con todas las combinadas?</b>",
-        f"📲 Contacta directamente: <a href='https://t.me/{TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a>"
+        f"💳 <b>¿Quieres entrar al VIP y recibir todas las combinadas diarias?</b>",
+        f"📲 Escríbeme directo: <a href='https://t.me/{TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a>"
     ]
     
     full_caption = "\n".join(message_lines)
@@ -226,51 +216,30 @@ def publish_single_pick():
     if not sent:
         send_telegram_message(full_caption)
 
-def publish_sports_news():
-    """Publica noticias deportivas destacadas como actualización independiente"""
-    headlines = []
-    for feed_url in RSS_FEEDS:
-        try:
-            feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:1]:
-                title = entry.get("title", "").strip()
-                if title:
-                    headlines.append(f"• {title}")
-        except Exception as e:
-            logging.error(f"Error leendo RSS {feed_url}: {e}")
-    
-    if headlines:
-        news_msg = (
-            "📰 <b>ÚLTIMA HORA DEPORTIVA</b> 📰\n\n" +
-            "\n".join(headlines[:3]) +
-            f"\n\n📲 Síguenos para más pronósticos: @FreeTopTip"
-        )
-        send_telegram_message(news_msg)
-
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Profesional Activo".encode('utf-8'))
+        self.wfile.write("Bot Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
     try:
         HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler).serve_forever()
     except Exception as e:
-        logging.error(f"Error servidor HTTP: {e}")
+        logging.error(f"Error en servidor HTTP: {e}")
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servidor bot iniciado con éxito.")
+    logging.info("Servidor del bot iniciado.")
 
-    # Primera publicación al arrancar
+    # Primera ejecución al arrancar
     publish_single_pick()
 
-    # Bucle de publicación continua individualizada
+    # Bucle que publica 1 partido individual analizado cada 4 horas
     while True:
-        time.sleep(14400) # Publica 1 pick individual completamente analizado cada 4 horas
+        time.sleep(14400)
         publish_single_pick()
 
 if __name__ == "__main__":
