@@ -15,7 +15,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+# Clave API integrada directamente para evitar fallos de lectura en el entorno
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g").strip()
 TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
@@ -92,25 +93,22 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         return None
 
 def generate_gemini_expert_analysis(match_name, league, pick, odds):
-    """Genera un análisis técnico experto y ultra-detallado mediante la API de Gemini."""
-    if not GEMINI_API_KEY:
-        return f"Contexto ambiental y estadio: En este duelo de {league}, el equipo local asume la iniciativa apoyado por su afición, generando un ritmo de asedio constante sobre área rival.\n\nEstructura táctica: Las propuestas ofensivas de ambos conjuntos abren espacios atrás, favoreciendo transiciones rápidas y múltiples opciones de remate bajo palos.\n\nRelación Riesgo/Beneficio: Entrar a cuota {odds:.2f} con esta selección en Bet365 ofrece un valor estadístico sobresaliente para la jornada."
-    
+    """Genera un análisis técnico único y ultra-detallado usando la API de Gemini."""
     prompt = f"""
-    Actúa como un tipster y analista de fútbol profesional experto en estadísticas avanzadas para el canal de Telegram @FreeTopTip.
-    Redacta un análisis técnico EXHAUSTIVO y MUY DETALLADO EN PRIMERA PERSONA ("He analizado", "Viendo el comportamiento...", "Me decido por...") sobre el siguiente encuentro:
+    Actúa como un tipster analista de fútbol profesional para el canal de Telegram @FreeTopTip.
+    Redacta un análisis técnico EXHAUSTIVO, ÚNICO Y 100% ORIGINAL EN PRIMERA PERSONA ("He analizado", "Viendo el comportamiento...", "Me decido por...") para este partido específico:
     
     Partido: {match_name}
     Competición: {league}
     Pronóstico / Selección: {pick}
     Cuota Bet365: {odds}
     
-    Estructura obligatoria que debe tener tu respuesta (con párrafos desarrollados y profesionales):
-    1. **Contexto ambiental y estadio:** Explica cómo presiona la afición local, el ritmo de salida y cómo obliga al rival a replegarse o intervenir activamente.
-    2. **Estructura táctica y rivales:** Detalla las líneas defensivas, la propuesta de juego, las transiciones ofensivas y los espacios que conceden.
-    3. **Relación Riesgo/Beneficio:** Justifica por qué esta selección a cuota {odds} tiene un valor estadístico excelente en Bet365.
+    Estructura obligatoria que debe tener tu respuesta (con párrafos profesionales y datos específicos de los equipos mencionados):
+    1. **Contexto ambiental y estadio:** Explica el factor local, cómo empuja la afición de este equipo en concreto y el ritmo con el que salen al terreno de juego.
+    2. **Estructura táctica y rivales:** Analiza las líneas de presión, el estilo de juego de ambos contendientes, las transiciones ofensivas y los espacios que conceden.
+    3. **Relación Riesgo/Beneficio:** Justifica estadísticamente por qué buscar esta selección concreta a cuota {odds} en Bet365 es una excelente oportunidad.
     
-    No utilices saludos ni despedidas. Escribe directamente el desglose analítico profesional.
+    Prohibido usar textos genéricos. Adapta cada bloque exclusivamente a los protagonistas reales de {match_name}. No uses saludos ni despedidas.
     """
     
     try:
@@ -119,15 +117,15 @@ def generate_gemini_expert_analysis(match_name, league, pick, odds):
         payload = {
             "contents": [{"parts": [{"text": prompt}]}]
         }
-        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        res = requests.post(url, headers=headers, json=payload, timeout=25)
         data = res.json()
         if "candidates" in data and len(data["candidates"]) > 0:
             return data["candidates"][0]["content"]["parts"][0]["text"].strip()
         else:
-            return f"Contexto ambiental y estadio: Analizando el encuentro en {league}, el empuje inicial del conjunto local condiciona el desarrollo del juego en campo rival.\n\nEstructura táctica: Las transiciones rápidas y los espacios que deja la defensa propician un volumen constante de ocasiones claras.\n\nRelación Riesgo/Beneficio: Buscar esta opción a cuota {odds:.2f} en Bet365 representa una de las mejores oportunidades de valor de la jornada."
+            return f"Contexto ambiental: Analizando el choque entre {match_name}, la tensión competitiva en {league} marcará el devenir del encuentro desde el pitido inicial.\n\nEstructura táctica: Las propuestas ofensivas de ambos planteles generan un intercambio constante de ocasiones en las áreas.\n\nRelación Riesgo/Beneficio: La cuota de {odds} ofrece un valor excelente."
     except Exception as e:
         logging.error(f"Error en API Gemini: {e}")
-        return f"Contexto ambiental y estadio: El planteamiento en {league} exige máxima concentración desde el pitido inicial debido a la intensidad del rival.\n\nEstructura táctica: El intercambio de golpes y la verticalidad de los ataques aseguran un escenario propicio para nuestra selección.\n\nRelación Riesgo/Beneficio: Con una cuota de {odds:.2f} en Bet365, el margen estadístico está completamente a nuestro favor."
+        return f"Contexto ambiental: Duelo de máxima exigencia en {league} para {match_name}.\n\nEstructura táctica: El ritmo de juego favorece nuestra selección.\n\nRelación Riesgo/Beneficio: Cuota {odds} con alto valor de mercado."
 
 def publish_pick(match_title, league_name, pick_text, odds_val):
     analysis_text = generate_gemini_expert_analysis(match_title, league_name, pick_text, odds_val)
@@ -207,14 +205,14 @@ def run_daily_routine():
     
     for match, league, pick, odds in TODAY_MATCHES:
         publish_pick(match, league, pick, odds)
-        time.sleep(4)
+        time.sleep(6) # Pausa de 6 segundos entre cada llamada para dar tiempo a Gemini a generar análisis únicos
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Gemini Extendido Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster Gemini Único Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -225,7 +223,7 @@ def run_http_server():
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster Inteligente Gemini Extendido en ejecución...")
+    logging.info("Servicio Tipster Inteligente Gemini Único en ejecución...")
 
     run_daily_routine()
 
