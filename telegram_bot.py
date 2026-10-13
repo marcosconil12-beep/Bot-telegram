@@ -12,19 +12,31 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- LIMPIEZA BLINDADA DE CREDENCIALES ---
-raw_token = "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c"
-TELEGRAM_BOT_TOKEN = str(raw_token).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
+def get_clean_token():
+    """Limpia el token de cualquier prefijo o corchete indeseado."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
+    token = str(token).strip()
+    
+    # Si viene con la URL pegada o duplicada, la extrae
+    if "api.telegram.org/bot" in token:
+        token = token.split("api.telegram.org/bot")[-1]
+    
+    # Limpia caracteres raros
+    for char in ['[', ']', '(', ')', "'", '"', ' ', '/']:
+        token = token.replace(char, '')
+        
+    return token.strip()
+
+TELEGRAM_BOT_TOKEN = get_clean_token()
 
 raw_chat = os.environ.get("TELEGRAM_CHAT_ID", "")
 CHAT_ID = str(raw_chat).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
 
 GEMINI_API_KEY = "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g"
-TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
+TELEGRAM_USERNAME = "Mark122"
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
-# Balance del Canal
 CHANNEL_STATS = {
     "wins": 65,
     "losses": 14,
@@ -33,11 +45,8 @@ CHANNEL_STATS = {
 }
 
 def send_telegram_message(text, reply_markup=None, target_chat=None):
-    if not TELEGRAM_BOT_TOKEN:
-        logging.error("Falta TELEGRAM_BOT_TOKEN.")
-        return None
+    token = get_clean_token()
     chat = str(target_chat or CHAT_ID).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
-    token = str(TELEGRAM_BOT_TOKEN).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     
     payload = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
@@ -51,10 +60,8 @@ def send_telegram_message(text, reply_markup=None, target_chat=None):
         return None
 
 def send_telegram_photo(photo_path, caption, reply_markup=None, target_chat=None):
-    if not TELEGRAM_BOT_TOKEN:
-        return None
+    token = get_clean_token()
     chat = str(target_chat or CHAT_ID).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
-    token = str(TELEGRAM_BOT_TOKEN).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
     try:
         with open(photo_path, 'rb') as photo:
@@ -104,11 +111,11 @@ def fetch_dynamic_daily_picks(count=4):
     Eres un analista táctico de fútbol profesional y tipster para el canal @FreeTopTip. Hoy es {date_today}.
     
     TAREA:
-    Genera {count} partidos REALES que se disputen HOY ({date_today}) en cualquier competición del mundo (grandes ligas, ligas secundarias o sudamericanas).
+    Genera {count} partidos REALES que se disputen HOY ({date_today}) en cualquier competición del mundo.
     Para cada uno crea un pronóstico de valor en Bet365 a cuota >= 2.00 y redacta un análisis técnico dividido estrictamente en tres bloques:
-    1. Contexto ambiental en el estadio
-    2. Estructura táctica del rival
-    3. Relación Riesgo/Beneficio
+    1. Contexto ambiental en el estadio: Describe la presión de la afición y el ritmo de inicio.
+    2. Estructura táctica del rival: Explica la alineación, transiciones y espacios concedidos.
+    3. Relación Riesgo/Beneficio: Justifica el valor de la cuota.
     
     Devuelve ÚNICAMENTE un array JSON válido con este formato exacto:
     [
@@ -219,9 +226,9 @@ def publish_single_pick_now():
 
 def handle_telegram_updates():
     offset = 0
-    token = str(TELEGRAM_BOT_TOKEN).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
     while True:
         try:
+            token = get_clean_token()
             url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){token}/getUpdates?offset={offset}&timeout=20"
             res = requests.get(url, timeout=25)
             data = res.json()
@@ -301,7 +308,6 @@ def main():
     threading.Thread(target=handle_telegram_updates, daemon=True).start()
     logging.info("Servicio Tipster en ejecución...")
 
-    # Publicación inmediata al arrancar
     run_daily_routine()
 
     now_spain = datetime.now(SPAIN_TZ)
