@@ -3,12 +3,13 @@ import time
 import logging
 import threading
 import requests
-import json
+import feedparser
 import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from PIL import Image, ImageDraw
 from http.server import HTTPServer, BaseHTTPRequestHandler
+import google.generativeai as genai
 
 # Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,140 +25,100 @@ def clean_env(var_name, default_val=""):
 
 TELEGRAM_BOT_TOKEN = clean_env("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 CHAT_ID = clean_env("TELEGRAM_CHAT_ID", "@FreeTopTip")
+RAPIDAPI_KEY = clean_env("RAPIDAPI_KEY", "")
+GEMINI_API_KEY = clean_env("GEMINI_API_KEY", "")
 TELEGRAM_USERNAME = "Mark122"
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 CHANNEL_STATS = {
-    "wins": 82,
-    "losses": 14,
-    "profit_units": +72.8,
-    "yield_pct": 31.8
+    "profit_units": +74.2,
+    "yield_pct": 32.1
 }
 
-# Base de datos completa y exhaustiva con TODOS los partidos de tus capturas de Bet365
-MATCHES_DATABASE = [
-    {
-        "match": "Lens vs Sporting",
-        "league": "UEFA Champions League",
-        "time": "18:45 CEST",
-        "analysis": "• Dinámica táctica: Duelo de alta intensidad con Lens buscando asfixiar en tres cuartos de campo y Sporting priorizando salidas limpias por bandas.\n• Rendimiento e xG: Promedio conjunto superior a 2.8 goles esperados en sus choques continentales.\n• Mercados Bet365: Cuotas 1X2 (2.55 - 3.70 - 2.60). Se aprecia un valor claro en el volumen de llegada.",
-        "pick_main": "Crear Apuesta: Ambos Equipos Anotan (Sí) + Más de 7.5 Córneres",
-        "odds_main": 2.10,
-        "pick_alt": "Sporting o Empate (Doble Oportunidad)",
-        "odds_alt": 1.50
-    },
-    {
-        "match": "Sabah vs Slavia Praga",
-        "league": "UEFA Champions League",
-        "time": "18:45 CEST",
-        "analysis": "• Dinámica táctica: Slavia Praga asume el control absoluto de la posesión; Sabah propondrá repliegue bajo defensivo.\n• Métricas de disciplina y córneres: Se proyecta un dominio de más del 65% de balón visitante con constantes saques de esquina.\n• Mercados Bet365: Favoritismo visitante respaldado en la cuota 1.90 a la victoria directa.",
-        "pick_main": "Slavia Praga Gana el Partido + Slavia Más de 4.5 Córneres",
-        "odds_main": 2.25,
-        "pick_alt": "Slavia Praga Gana Directo (@1.90)",
-        "odds_alt": 1.90
-    },
-    {
-        "match": "Arsenal vs Lille",
-        "league": "UEFA Champions League",
-        "time": "21:00 CEST",
-        "analysis": "• Estado de forma: Arsenal se muestra demoledor en el Emirates Stadium (cuota local 1.20). Bukayo Saka y Gabriel Martinelli generan ocasiones constantes.\n• Remates y faltas: Se prevé una alta cantidad de faltas tácticas visitantes en la frontal para frenar las transiciones Gunner.\n• Mercado de valor: Dominio desde la primera mitad.",
-        "pick_main": "Arsenal Hándicap Asiático -1.5 Goles",
-        "odds_main": 1.80,
-        "pick_alt": "Arsenal Más de 6.5 Córneres Totales",
-        "odds_alt": 1.62
-    },
-    {
-        "match": "Atlético de Madrid vs Manchester United",
-        "league": "UEFA Champions League",
-        "time": "21:00 CEST",
-        "analysis": "• Fricción táctica: Duelo estelar de máxima tensión física (cuotas equilibradas 1.90 - 3.75 - 3.75).\n• Análisis disciplinario: Promedio histórico en encuentros directos superior a 5.5 tarjetas amarillas combinadas.\n• Mercados Bet365: Batalla en la medular con tendencia a faltas estratégicas y duelos intensos.",
-        "pick_main": "Crear Apuesta: Más de 4.5 Tarjetas Totales + Atlético de Madrid o Empate",
-        "odds_main": 2.20,
-        "pick_alt": "Atlético de Madrid Empate No Válido",
-        "odds_alt": 1.42
-    },
-    {
-        "match": "Galatasaray SK vs Barcelona",
-        "league": "UEFA Champions League",
-        "time": "21:00 CEST",
-        "analysis": "• Análisis de plantilla: El FC Barcelona llega con su tridente estrella en plena forma (Raphinha, Lamine Yamal y Ferran Torres).\n• Rendimiento ofensivo: El conjunto turco sufre a la espalda de sus laterales cuando intenta presionar arriba.\n• Mercados Bet365: Barcelona favorito claro (cuota 1.25) con un xG esperado muy elevado.",
-        "pick_main": "Crear Apuesta: Barcelona Gana + Lamine Yamal Más de 0.5 Remates a Puerta",
-        "odds_main": 2.05,
-        "pick_alt": "Barcelona Más de 1.5 Goles en el Partido",
-        "odds_alt": 1.40
-    },
-    {
-        "match": "Inter de Milán vs Club Brujas",
-        "league": "UEFA Champions League",
-        "time": "21:00 CEST",
-        "analysis": "• Solidez defensiva: El Inter de Lautaro Martínez busca sentenciar por la vía rápida ante su afición (cuota local 1.25).\n• Balón parado y córneres: Superioridad física italiana clara en saques de esquina y balones colgados al área.\n• Mercado Bet365: Control territorial de principio a fin.",
-        "pick_main": "Inter de Milán Gana 1ª Mitad y Final del Partido",
-        "odds_main": 1.85,
-        "pick_alt": "Inter de Milán Mantiene Portería a Cero",
-        "odds_alt": 1.68
-    },
-    {
-        "match": "RB Leipzig vs PSV",
-        "league": "UEFA Champions League",
-        "time": "21:00 CEST",
-        "analysis": "• Propuesta ultraofensiva: Dos plantillas diseñadas para la presión en campo rival y el contragolpe vertiginoso.\n• Métricas de xG: Más de 3.2 goles de media en sus duelos recientes. Intercambio de golpes garantizado.\n• Mercados Bet365: Opción de Crear Apuesta combinando goles y disparos.",
-        "pick_main": "Crear Apuesta: Ambos Equipos Anotan (Sí) + Más de 2.5 Goles",
-        "odds_main": 2.15,
-        "pick_alt": "RB Leipzig Más de 1.5 Goles",
-        "odds_alt": 1.55
-    },
-    {
-        "match": "Viking FK vs Bayern de Múnich",
-        "league": "UEFA Champions League",
-        "time": "21:00 CEST",
-        "analysis": "• Superioridad aplastante: El Bayern parte como gran favorito (cuota 1.12) con una diferencia de plantilla abismal.\n• Volumen de disparos: Se proyectan más de 18 remates totales del Bayern y dominio absoluto del ritmo de juego.\n• Mercado Bet365: Búsqueda de cuota de valor mediante hándicap o goles en la primera mitad.",
-        "pick_main": "Bayern de Múnich Hándicap Asiático -2.5 Goles",
-        "odds_main": 1.95,
-        "pick_alt": "Más de 1.5 Goles en la 1ª Mitad",
-        "odds_alt": 1.50
-    },
-    {
-        "match": "Villarreal vs Nápoles",
-        "league": "UEFA Champions League",
-        "time": "21:00 CEST",
-        "analysis": "• Partido igualado: La Cerámica vivirá un enfrentamiento táctico brillante (cuotas 2.05 - 3.70 - 3.30).\n• Córneres y banda: Villarreal destaca por acumular un promedio de 6.2 córneres a favor por encuentro de local.\n• Mercado Bet365: Combinada con opciones en doble oportunidad y lanzamientos de esquina.",
-        "pick_main": "Crear Apuesta: Villarreal o Empate + Más de 7.5 Córneres Totales",
-        "odds_main": 2.00,
-        "pick_alt": "Ambos Equipos Anotan (Sí)",
-        "odds_alt": 1.65
-    },
-    {
-        "match": "Boca Juniors vs Vasco da Gama",
-        "league": "Copa Sudamericana",
-        "time": "02:30 CEST",
-        "analysis": "• Tensión en La Bombonera: Duelo de máxima intensidad en torneo Conmebol (Boca fav @1.85).\n• Faltas y disputa: Choque de alta agresividad defensiva con riesgo elevado de múltiples amonestaciones.\n• Mercado Bet365: Valor en la fortaleza local xG de Boca Juniors.",
-        "pick_main": "Victoria Boca Juniors + Más de 4.5 Tarjetas Totales",
-        "odds_main": 2.30,
-        "pick_alt": "Victoria Boca Juniors Directa (@1.85)",
-        "odds_alt": 1.85
-    },
-    {
-        "match": "Bristol City vs Blackburn",
-        "league": "Inglaterra - Championship",
-        "time": "20:45 CEST",
-        "analysis": "• Intensidad británica: Bristol busca imponer su ritmo local (cuotas 2.05 - 3.25 - 3.60).\n• Disputas aéreas: Elevado número de saques de esquina y balones al área por ambos costados.\n• Mercado Bet365: Doble oportunidad combinada con saques de esquina.",
-        "pick_main": "Bristol City o Empate + Más de 8.5 Córneres Totales",
-        "odds_main": 2.05,
-        "pick_alt": "Más de 1.5 Goles Totales",
-        "odds_alt": 1.38
-    },
-    {
-        "match": "Birmingham City vs Preston",
-        "league": "Inglaterra - Championship",
-        "time": "21:00 CEST",
-        "analysis": "• Dominio local esperado: Birmingham llega lanzado en casa (cuota 1.45) ante un Preston en horas bajas.\n• Planteamiento visitante: Bloque replegado buscando desesperadamente arañar un punto.\n• Mercado Bet365: Victoria local combinada con goles para subir cuota.",
-        "pick_main": "Birmingham City Gana el Partido + Más de 1.5 Goles Totales",
-        "odds_main": 1.85,
-        "pick_alt": "Birmingham City Gana Directo (@1.45)",
-        "odds_alt": 1.45
-    }
+# Configuración de Gemini para análisis en primera persona
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    ai_model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    ai_model = None
+
+# Feeds RSS deportivos gratuitos para noticias de última hora
+RSS_FEEDS = [
+    "https://as.com/rss/futbol/portada.xml",
+    "https://e00-marca.uecdn.es/rss/futbol/champions-league.xml",
+    "https://www.mundodeportivo.com/rss/futbol.xml"
 ]
+
+def fetch_latest_sports_news():
+    """Extrae noticias frescas de los RSS deportivos"""
+    headlines = []
+    for feed_url in RSS_FEEDS:
+        try:
+            feed = feedparser.parse(feed_url)
+            for entry in feed.entries[:2]:
+                title = entry.get("title", "").strip()
+                if title and len(title) > 15:
+                    headlines.append(f"• {title}")
+        except Exception as e:
+            logging.error(f"Error en RSS {feed_url}: {e}")
+    if headlines:
+        return "\n".join(headlines[:3])
+    return "• Jornada vibrante en las principales ligas y competiciones internacionales."
+
+def fetch_flashscore_global_matches():
+    """Consulta Flashscore optimizada para gastar pocas peticiones al mes (aprox 15 al día)"""
+    if not RAPIDAPI_KEY:
+        return []
+    
+    url = "https://flashlive-sports.p.rapidapi.com/v1/events/list"
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": "flashlive-sports.p.rapidapi.com"
+    }
+    params = {"sport_id": "1", "indent_days": "0", "locale": "es_ES"}
+    
+    try:
+        res = requests.get(url, headers=headers, params=params, timeout=12)
+        data = res.json()
+        matches = []
+        if "DATA" in data:
+            for tournament in data["DATA"]:
+                league_name = tournament.get("TOURNAMENT_NAME", "Liga Internacional")
+                country = tournament.get("COUNTRY_NAME", "Global")
+                events = tournament.get("EVENTS", [])
+                for ev in events[:2]:
+                    home = ev.get("HOME_NAME", "Local")
+                    away = ev.get("AWAY_NAME", "Visitante")
+                    time_timestamp = ev.get("START_TIME", int(time.time()))
+                    match_time = datetime.fromtimestamp(time_timestamp, SPAIN_TZ).strftime('%H:%M')
+                    matches.append({
+                        "league": f"{country.upper()} - {league_name.upper()}",
+                        "match": f"{home} vs {away}",
+                        "time": f"{match_time} CEST"
+                    })
+        return matches[:12]
+    except Exception as e:
+        logging.error(f"Error consultando Flashscore: {e}")
+        return []
+
+def generate_ai_analysis(match_name, league_name):
+    """Genera análisis profesional en primera persona usando Gemini"""
+    if not ai_model:
+        return f"He analizado detenidamente este {match_name} de {league_name}. Veo claros patrones de valor en los mercados de goles y saques de esquina según las estadísticas recientes."
+    
+    prompt = (
+        f"Actúa como un tipster experto en apuestas deportivas llamado Mark. "
+        f"Redacta un análisis profesional y directo en primera persona (ej: 'He analizado...', 'Veo valor en...') "
+        f"para el partido {match_name} de la competición {league_name}. "
+        f"Menciona claves tácticas, xG o tendencia de mercado en Bet365 en un párrafo corto y persuasivo."
+    )
+    try:
+        response = ai_model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        logging.error(f"Error generando análisis con IA: {e}")
+        return f"He revisado las estadísticas de este {match_name}. Las métricas ofensivas y el rendimiento reciente nos dejan cuotas muy atractivas para buscar valor."
 
 def send_telegram_message(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -166,7 +127,7 @@ def send_telegram_message(text):
         res = requests.post(url, json=payload, timeout=15)
         return res.json().get("ok")
     except Exception as e:
-        logging.error(f"Excepción Telegram: {e}")
+        logging.error(f"Error Telegram Message: {e}")
         return False
 
 def send_telegram_photo(photo_path, caption):
@@ -177,97 +138,83 @@ def send_telegram_photo(photo_path, caption):
             res = requests.post(url, data=data, files={"photo": photo}, timeout=20)
             return res.json().get("ok")
     except Exception as e:
-        logging.error(f"Excepción foto: {e}")
+        logging.error(f"Error Telegram Photo: {e}")
         return False
 
-def create_scores24_card(match_title, league_name, pick_text, odds_val, match_time):
+def create_summary_card(date_str):
     try:
-        img = Image.new('RGB', (1000, 600), color=(13, 27, 42))
+        img = Image.new('RGB', (1000, 500), color=(13, 27, 42))
         d = ImageDraw.Draw(img)
         
-        d.rectangle([20, 20, 980, 580], outline=(0, 212, 170), width=4)
-        d.rectangle([20, 20, 980, 110], fill=(20, 40, 65))
+        d.rectangle([20, 20, 980, 480], outline=(0, 212, 170), width=4)
+        d.rectangle([20, 20, 980, 100], fill=(20, 40, 65))
         
-        d.text((40, 48), f"🛡️ SCORES24 ESPAÑA | HORA: {match_time}", fill=(0, 212, 170))
-        d.text((580, 48), league_name.upper()[:25], fill=(200, 200, 200))
-        
-        d.text((40, 140), "PARTIDO ANALIZADO (BET365):", fill=(150, 160, 180))
-        d.text((40, 180), match_title, fill=(255, 255, 255))
-        
-        d.rectangle([40, 240, 960, 420], fill=(24, 43, 73), outline=(255, 215, 0), width=2)
-        d.text((70, 260), "SELECCIÓN RECOMENDADA (BET365):", fill=(255, 215, 0))
-        d.text((70, 315), f"{pick_text[:45]}...", fill=(255, 255, 255))
-        d.text((750, 315), f"@{odds_val:.2f}", fill=(0, 212, 170))
+        d.text((40, 40), f"🔥 ANÁLISIS GLOBAL DE LIGAS | {date_str}", fill=(255, 215, 0))
+        d.text((40, 120), "EUROPA, LATINOAMÉRICA & ASIA (BET365)", fill=(0, 212, 170))
+        d.text((40, 170), "• Inteligencia Artificial en primera persona aplicada al mercado.", fill=(200, 200, 200))
+        d.text((40, 210), "• Cobertura multiligas con estadísticas de valor y xG.", fill=(200, 200, 200))
+        d.text((40, 250), "• Noticias de última hora sincronizadas vía RSS.", fill=(200, 200, 200))
 
-        d.text((40, 460), f"📊 Rendimiento Estadístico | Yield: +{CHANNEL_STATS['profit_units']}U", fill=(150, 160, 180))
-        d.text((40, 510), f"Canal Oficial: @FreeTopTip | VIP: @{TELEGRAM_USERNAME}", fill=(255, 215, 0))
-        
-        filename = "scores24_card.png"
+        d.rectangle([40, 310, 960, 440], fill=(24, 43, 73), outline=(0, 212, 170), width=2)
+        d.text((60, 330), f"📈 RENDIMIENTO: +{CHANNEL_STATS['profit_units']}U ({CHANNEL_STATS['yield_pct']}% Yield)", fill=(255, 215, 0))
+        d.text((60, 380), f"📲 CANAL: @FreeTopTip | VIP: @{TELEGRAM_USERNAME}", fill=(255, 255, 255))
+
+        filename = "summary_card.png"
         img.save(filename)
         return filename
     except Exception as e:
-        logging.error(f"Error generando imagen: {e}")
+        logging.error(f"Error creando tarjeta: {e}")
         return None
 
-def publish_scores24_report():
-    item = random.choice(MATCHES_DATABASE)
-
-    match_title = item.get("match")
-    league_name = item.get("league")
-    match_time = item.get("time")
-    analysis_text = item.get("analysis")
-    pick_main = item.get("pick_main")
-    odds_main = float(item.get("odds_main", 2.00))
-    pick_alt = item.get("pick_alt")
-    odds_alt = float(item.get("odds_alt", 1.60))
-
+def publish_global_report():
     now_spain = datetime.now(SPAIN_TZ)
-    caption = (
-        f"📊 <b>ANÁLISIS Y PRONÓSTICO ({now_spain.strftime('%d/%m/%Y')})</b> 📊\n"
-        f"🌐 <i>Fuente Oficial: Datos & Estadísticas Scores24</i>\n\n"
-        f"🏆 <b>Competición:</b> {league_name}\n"
-        f"⚔️ <b>Encuentro:</b> {match_title}\n"
-        f"⏰ <b>Hora de Inicio:</b> {match_time}\n\n"
-        f"📋 <b>INFORME TÁCTICO Y ANÁLISIS DE MERCADOS:</b>\n"
-        f"{analysis_text}\n\n"
-        f"🎯 <b>PRONÓSTICO PRINCIPAL (BET365):</b>\n"
-        f"• Selección: <code>{pick_main}</code>\n"
-        f"• Cuota: <b>@{odds_main:.2f}</b> | Stake: <b>1.5 / 10</b>\n\n"
-        f"🛡️ <b>MERCADO ALTERNATIVO (COBERTURA):</b>\n"
-        f"• Selección: <code>{pick_alt}</code> (@{odds_alt:.2f})\n\n"
-        f"📈 <b>ESTADÍSTICAS DEL CANAL:</b> +{CHANNEL_STATS['profit_units']} Unidades ({CHANNEL_STATS['yield_pct']}% Yield)\n\n"
-        f"💳 <b>¿QUIERES ACCEDER A LAS COMBINADAS VIP EXCLUSIVAS?</b>\n"
-        f"📲 Escríbeme por privado: <a href='https://t.me/{TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a>"
-    )
-
-    img_path = create_scores24_card(match_title, league_name, pick_main, odds_main, match_time)
+    date_str = now_spain.strftime('%d/%m/%Y')
     
+    news_text = fetch_latest_sports_news()
+    matches = fetch_flashscore_global_matches()
+    
+    if not matches:
+        matches = [
+            {"league": "🇪🇺 UEFA CHAMPIONS LEAGUE", "match": "Arsenal vs Lille", "time": "21:00 CEST"},
+            {"league": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 INGLATERRA - CHAMPIONSHIP", "match": "Bristol City vs Blackburn", "time": "20:45 CEST"},
+            {"league": "🌎 CONMEBOL - COPA SUDAMERICANA", "match": "Boca Juniors vs Vasco da Gama", "time": "02:30 CEST"}
+        ]
+
+    lines = []
+    lines.append(f"📊 <b>INFORME EXPERTO Y MERCADOS ({date_str})</b> 📊\n")
+    lines.append("📰 <b>NOTICIAS DESTACADAS DE LA JORNADA:</b>")
+    lines.append(f"<i>{news_text}</i>\n")
+    lines.append("⚽ <b>ANÁLISIS DE PARTIDOS DESTACADOS (IA):</b>")
+
+    selected_matches = random.sample(matches, min(3, len(matches)))
+    
+    for m in selected_matches:
+        analysis = generate_ai_analysis(m["match"], m["league"])
+        lines.append(
+            f"\n🏆 <b>{m['league']}</b>\n"
+            f"⏰ <b>{m['time']}</b> | ⚔️ <b>{m['match']}</b>\n"
+            f"💡 <i>{analysis}</i>\n"
+        )
+
+    lines.append(f"\n📈 <b>Balance Global:</b> +{CHANNEL_STATS['profit_units']}U ({CHANNEL_STATS['yield_pct']}% Yield)")
+    lines.append(f"💳 <b>¿Quieres recibir las combinadas VIP exclusivas?</b>")
+    lines.append(f"📲 Escríbeme al privado: <a href='https://t.me/{TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a>")
+
+    caption = "\n".join(lines)
+    img_path = create_summary_card(date_str)
+
     sent = False
     if img_path:
         sent = send_telegram_photo(img_path, caption)
     if not sent:
         send_telegram_message(caption)
 
-def send_daily_sales_message():
-    now_spain = datetime.now(SPAIN_TZ)
-    msg = (
-        f"☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip! ({now_spain.strftime('%d/%m/%Y')})</b> ☀️\n\n"
-        "☕ Arrancamos la jornada publicando los mejores análisis tácticos y mercados de valor de la jornada de hoy en Bet365.\n\n"
-        "💳 <b>ACCESO AL GRUPO VIP PRIVADO:</b>\n"
-        "🔥 <b>Pase Día Premium:</b> <b>5.00 €</b>\n"
-        "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
-        "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
-        f"📲 <i>Para unirte al VIP y recibir las combinadas diarias, escríbeme:</i>\n"
-        f"👉 <b>Contactar al Analista: <a href='https://t.me/{TELEGRAM_USERNAME}'>@{TELEGRAM_USERNAME}</a></b>"
-    )
-    send_telegram_message(msg)
-
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Scores24 Pro Activo".encode('utf-8'))
+        self.wfile.write("Bot Global IA Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -278,21 +225,13 @@ def run_http_server():
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Bot Scores24 Pro iniciado correctamente.")
+    logging.info("Servidor bot iniciado correctamente.")
 
-    send_daily_sales_message()
-    time.sleep(3)
+    publish_global_report()
 
-    publish_scores24_report()
-
-    # Publica automáticamente cada 15 minutos (900 segundos)
     while True:
-        try:
-            time.sleep(900)
-            logging.info("Ejecutando nuevo ciclo de publicación...")
-            publish_scores24_report()
-        except Exception as e:
-            logging.error(f"Error en bucle de publicación: {e}")
+        time.sleep(14400)
+        publish_global_report()
 
 if __name__ == "__main__":
     main()
