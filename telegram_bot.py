@@ -2,7 +2,8 @@ import os
 import time
 import logging
 import threading
-import requests
+import urllib.request
+import urllib.parse
 import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -12,26 +13,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # Configuración de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def get_clean_token():
-    """Limpia el token de cualquier prefijo o corchete indeseado."""
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
-    token = str(token).strip()
-    
-    # Si viene con la URL pegada o duplicada, la extrae
-    if "api.telegram.org/bot" in token:
-        token = token.split("api.telegram.org/bot")[-1]
-    
-    # Limpia caracteres raros
-    for char in ['[', ']', '(', ')', "'", '"', ' ', '/']:
-        token = token.replace(char, '')
-        
-    return token.strip()
-
-TELEGRAM_BOT_TOKEN = get_clean_token()
-
-raw_chat = os.environ.get("TELEGRAM_CHAT_ID", "")
-CHAT_ID = str(raw_chat).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
-
+# Credenciales limpias y blindadas directamente en código
+TELEGRAM_BOT_TOKEN = "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c"
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 GEMINI_API_KEY = "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g"
 TELEGRAM_USERNAME = "Mark122"
 
@@ -45,34 +29,79 @@ CHANNEL_STATS = {
 }
 
 def send_telegram_message(text, reply_markup=None, target_chat=None):
-    token = get_clean_token()
-    chat = str(target_chat or CHAT_ID).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    chat = str(target_chat or CHAT_ID).strip()
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     
     payload = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
+        
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
     try:
-        res = requests.post(url, json=payload, timeout=12)
-        return res.json().get("ok")
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res = json.loads(response.read().decode('utf-8'))
+            return res.get("ok")
     except Exception as e:
-        logging.error(f"Error enviando mensaje: {e}")
+        logging.error(f"Error enviando mensaje con urllib: {e}")
         return None
 
 def send_telegram_photo(photo_path, caption, reply_markup=None, target_chat=None):
-    token = get_clean_token()
-    chat = str(target_chat or CHAT_ID).replace('[', '').replace(']', '').replace("'", "").replace('"', '').strip()
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    chat = str(target_chat or CHAT_ID).strip()
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
+    
+    # Método robusto para enviar foto por multipart usando urllib
     try:
-        with open(photo_path, 'rb') as photo:
-            data = {"chat_id": chat, "caption": caption, "parse_mode": "HTML"}
-            if reply_markup:
-                data["reply_markup"] = json.dumps(reply_markup)
-            res = requests.post(url, data=data, files={"photo": photo}, timeout=15)
-            return res.json().get("ok")
+        boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
+        data_body = []
+        
+        data_body.append(f'--{boundary}'.encode('utf-8'))
+        data_body.append(f'Content-Disposition: form-data; name="chat_id"'.encode('utf-8'))
+        data_body.append(b'')
+        data_body.append(chat.encode('utf-8'))
+        
+        data_body.append(f'--{boundary}'.encode('utf-8'))
+        data_body.append(f'Content-Disposition: form-data; name="caption"'.encode('utf-8'))
+        data_body.append(b'')
+        data_body.append(caption.encode('utf-8'))
+        
+        data_body.append(f'--{boundary}'.encode('utf-8'))
+        data_body.append(f'Content-Disposition: form-data; name="parse_mode"'.encode('utf-8'))
+        data_body.append(b'')
+        data_body.append(b'HTML')
+        
+        if reply_markup:
+            data_body.append(f'--{boundary}'.encode('utf-8'))
+            data_body.append(f'Content-Disposition: form-data; name="reply_markup"'.encode('utf-8'))
+            data_body.append(b'')
+            data_body.append(json.dumps(reply_markup).encode('utf-8'))
+            
+        with open(photo_path, 'rb') as f:
+            photo_bytes = f.read()
+            
+        data_body.append(f'--{boundary}'.encode('utf-8'))
+        data_body.append(f'Content-Disposition: form-data; name="photo"; filename="card.png"'.encode('utf-8'))
+        data_body.append(b'Content-Type: image/png')
+        data_body.append(b'')
+        data_body.append(photo_bytes)
+        
+        data_body.append(f'--{boundary}--'.encode('utf-8'))
+        data_body.append(b'')
+        
+        body = b'\r\n'.join(data_body)
+        headers = {
+            'Content-Type': f'multipart/form-data; boundary={boundary}',
+            'Content-Length': str(len(body))
+        }
+        
+        req = urllib.request.Request(url, data=body, headers=headers)
+        with urllib.request.urlopen(req, timeout=20) as response:
+            res = json.loads(response.read().decode('utf-8'))
+            return res.get("ok")
     except Exception as e:
-        logging.error(f"Error enviando foto: {e}")
-        return None
+        logging.error(f"Error enviando foto con urllib: {e}")
+        # Si falla la foto por cualquier motivo, envía al menos el texto para no perder el pick
+        return send_telegram_message(caption, reply_markup=reply_markup, target_chat=target_chat)
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val):
     try:
@@ -131,17 +160,17 @@ def fetch_dynamic_daily_picks(count=4):
 
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        headers = {"Content-Type": "application/json"}
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        res = requests.post(url, headers=headers, json=payload, timeout=30)
-        data = res.json()
-        if "candidates" in data and len(data["candidates"]) > 0:
-            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            if raw_text.startswith("```json"):
-                raw_text = raw_text.replace("```json", "").replace("```", "").strip()
-            elif raw_text.startswith("```"):
-                raw_text = raw_text.replace("```", "").strip()
-            return json.loads(raw_text)
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            if "candidates" in data and len(data["candidates"]) > 0:
+                raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                if raw_text.startswith("```json"):
+                    raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+                elif raw_text.startswith("```"):
+                    raw_text = raw_text.replace("```", "").strip()
+                return json.loads(raw_text)
     except Exception as e:
         logging.error(f"Error obteniendo picks de Gemini: {e}")
     
@@ -228,48 +257,48 @@ def handle_telegram_updates():
     offset = 0
     while True:
         try:
-            token = get_clean_token()
-            url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){token}/getUpdates?offset={offset}&timeout=20"
-            res = requests.get(url, timeout=25)
-            data = res.json()
-            
-            if data.get("ok"):
-                for update in data.get("result", []):
-                    offset = update["update_id"] + 1
-                    message = update.get("message", {})
-                    text = message.get("text", "").strip()
-                    user_chat_id = message.get("chat", {}).get("id")
-                    
-                    if not text:
-                        continue
+            url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){TELEGRAM_BOT_TOKEN}/getUpdates?offset={offset}&timeout=20"
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=25) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                
+                if data.get("ok"):
+                    for update in data.get("result", []):
+                        offset = update["update_id"] + 1
+                        message = update.get("message", {})
+                        text = message.get("text", "").strip()
+                        user_chat_id = message.get("chat", {}).get("id")
                         
-                    if text == "/start" or text == "/help":
-                        help_text = (
-                            "👋 <b>¡Hola Admin! Menú de Control del Bot TopTips:</b>\n\n"
-                            "• <b>/pick</b> ➔ Publica 1 pick nuevo con análisis en el canal ahora mismo.\n"
-                            "• <b>/ventas</b> ➔ Publica el mensaje comercial VIP en el canal.\n"
-                            "• <b>/balance</b> ➔ Publica el balance de aciertos y yield en el canal."
-                        )
-                        send_telegram_message(help_text, target_chat=user_chat_id)
-                        
-                    elif text == "/pick":
-                        send_telegram_message("⏳ Generando pick con Gemini y publicando en el canal...", target_chat=user_chat_id)
-                        ok = publish_single_pick_now()
-                        if ok:
-                            send_telegram_message("✅ ¡Pick publicado con éxito en el canal!", target_chat=user_chat_id)
-                        else:
-                            send_telegram_message("❌ Error generando el pick. Inténtalo de nuevo.", target_chat=user_chat_id)
+                        if not text:
+                            continue
                             
-                    elif text == "/ventas":
-                        send_daily_sales_message()
-                        send_telegram_message("✅ Mensaje de ventas publicado en el canal.", target_chat=user_chat_id)
-                        
-                    elif text == "/balance":
-                        send_evening_recap()
-                        send_telegram_message("✅ Resumen y balance publicado en el canal.", target_chat=user_chat_id)
+                        if text == "/start" or text == "/help":
+                            help_text = (
+                                "👋 <b>¡Hola Admin! Menú de Control del Bot TopTips:</b>\n\n"
+                                "• <b>/pick</b> ➔ Publica 1 pick nuevo con análisis en el canal ahora mismo.\n"
+                                "• <b>/ventas</b> ➔ Publica el mensaje comercial VIP en el canal.\n"
+                                "• <b>/balance</b> ➔ Publica el balance de aciertos y yield en el canal."
+                            )
+                            send_telegram_message(help_text, target_chat=user_chat_id)
+                            
+                        elif text == "/pick":
+                            send_telegram_message("⏳ Generando pick con Gemini y publicando en el canal...", target_chat=user_chat_id)
+                            ok = publish_single_pick_now()
+                            if ok:
+                                send_telegram_message("✅ ¡Pick publicado con éxito en el canal!", target_chat=user_chat_id)
+                            else:
+                                send_telegram_message("❌ Error generando el pick. Inténtalo de nuevo.", target_chat=user_chat_id)
+                                
+                        elif text == "/ventas":
+                            send_daily_sales_message()
+                            send_telegram_message("✅ Mensaje de ventas publicado en el canal.", target_chat=user_chat_id)
+                            
+                        elif text == "/balance":
+                            send_evening_recap()
+                            send_telegram_message("✅ Resumen y balance publicado en el canal.", target_chat=user_chat_id)
 
         except Exception as e:
-            logging.error(f"Error en listener de Telegram: {e}")
+            logging.error(f"Error en listener de Telegram con urllib: {e}")
             
         time.sleep(2)
 
@@ -294,7 +323,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Tipster Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster Activo con urllib".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
