@@ -15,21 +15,22 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Variables de entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+# Clave de API de Gemini integrada
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6IzHOYBnb0nCJ_95k78xwox8--fOsWPf94ytRYPuGtk4g").strip()
 TELEGRAM_USERNAME = "Mark122" # Tu usuario para ventas VIP
 
-# Zona horaria de España
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # Balance del Canal
 CHANNEL_STATS = {
-    "wins": 62,
-    "losses": 13,
-    "profit_units": +48.2
+    "wins": 65,
+    "losses": 14,
+    "profit_units": +51.8
 }
 
 def send_telegram_message(text, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not CHAT_ID:
-        logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID en Railway.")
+        logging.error("Falta TELEGRAM_BOT_TOKEN o CHAT_ID en las variables.")
         return None
     token = str(TELEGRAM_BOT_TOKEN).strip().replace('"', '').replace("'", "")
     chat = str(CHAT_ID).strip().replace('"', '').replace("'", "")
@@ -40,10 +41,10 @@ def send_telegram_message(text, reply_markup=None):
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
     try:
-        res = requests.post(url, json=payload, timeout=10)
+        res = requests.post(url, json=payload, timeout=12)
         return res.json().get("ok")
     except Exception as e:
-        logging.error(f"Error enviando mensaje: {e}")
+        logging.error(f"Error enviando mensaje a Telegram: {e}")
         return None
 
 def send_telegram_photo(photo_path, caption, reply_markup=None):
@@ -58,10 +59,10 @@ def send_telegram_photo(photo_path, caption, reply_markup=None):
             data = {"chat_id": chat, "caption": caption, "parse_mode": "HTML"}
             if reply_markup:
                 data["reply_markup"] = json.dumps(reply_markup)
-            res = requests.post(url, data=data, files={"photo": photo}, timeout=12)
+            res = requests.post(url, data=data, files={"photo": photo}, timeout=15)
             return res.json().get("ok")
     except Exception as e:
-        logging.error(f"Error enviando foto: {e}")
+        logging.error(f"Error enviando foto a Telegram: {e}")
         return None
 
 def create_scores24_card(match_title, league_name, pick_text, odds_val):
@@ -79,235 +80,193 @@ def create_scores24_card(match_title, league_name, pick_text, odds_val):
         d.text((40, 180), match_title, fill=(255, 255, 255))
         
         d.rectangle([40, 240, 960, 420], fill=(24, 43, 73), outline=(255, 215, 0), width=2)
-        d.text((70, 260), "SELECCIÓN RECOMENDADA:", fill=(255, 215, 0))
+        d.text((70, 260), "SELECCIÓN RECOMENDADA (BET365):", fill=(255, 215, 0))
         d.text((70, 315), f"{pick_text[:45]}...", fill=(255, 255, 255))
         d.text((750, 315), f"@{odds_val:.2f}", fill=(0, 212, 170))
 
         d.text((40, 460), f"📊 Métricas: Rendimiento Táctico | Yield: +{CHANNEL_STATS['profit_units']}U", fill=(150, 160, 180))
-        d.text((40, 510), f"Canal Oficial: TOPTIPS | Suscripción VIP: @{TELEGRAM_USERNAME}", fill=(255, 215, 0))
+        d.text((40, 510), f"Canal Oficial: @FreeTopTip | Suscripción VIP: @{TELEGRAM_USERNAME}", fill=(255, 215, 0))
         
         filename = "scores24_card.png"
         img.save(filename)
         return filename
     except Exception as e:
-        logging.error(f"Error tarjeta: {e}")
+        logging.error(f"Error generando imagen: {e}")
         return None
 
-# --- PUBLICACIONES RFEF ESPAÑA ---
-RFEF_MATCHES = [
-    ("Ourense CF vs Zamora CF", "Primera RFEF - Gr. 1", "Victoria Zamora CF (Hándicap 0)", 2.05, "El Zamora se muestra impecable tácticamente como visitante en transiciones rápidas y Ourense deja muchas dudas en salida de balón."),
-    ("UD Logroñés vs CD Numancia", "Segunda RFEF - Gr. 2", "Más de 2.0 Goles Totales", 1.85, "Duelo directo en la parte alta. Ambos promedian un volumen de tiro alto y defensas concediendo ocasiones a balón parado."),
-    ("SE Penya Independent vs CE Andratx", "Segunda RFEF - Gr. 3", "Victoria Penya Independent", 2.10, "El factor campo balear y el ritmo físico de Penya Independent marcarán la diferencia en los segundos 45 minutos."),
-    ("Tenerife B vs CD Paso", "Segunda RFEF - Gr. 5", "Más de 8.5 Córneres", 1.90, "Partido dinámico de juego por bandas. El filial chicharrero genera una media de 6.5 saques de esquina en su feudo."),
-    ("Real Jaén vs UD Maracena", "Tercera RFEF - Gr. 9", "Victoria Real Jaén -1.0 HC", 1.95, "El Jaén impone una presión asfixiante en La Victoria frente a un rival que sufre encajando temprano fuera de casa."),
-    ("CD Tropezón vs UM Escobedo", "Tercera RFEF - Gr. 3", "Ambos Anotan (Sí)", 2.00, "Choque cántabro con plantillas muy parejas y pólvora arriba. La efectividad en las áreas asegura presencia de goles."),
-    ("Utebo FC vs SD Ejea", "Segunda RFEF - Gr. 2", "Doble Oportunidad Utebo/Empate + Más de 1.5 Goles", 1.80, "Utebo se mantiene invicto en casa con un bloque defensivo ordenado y salidas incisivas a la contra."),
-    ("Salamanca UDS vs Bergantiños CF", "Segunda RFEF - Gr. 1", "Más de 4.5 Tarjetas", 1.85, "Partido tenso en el Helmántico con duelo directo en el centro del campo y un colegiado de promedio alto en amonestaciones."),
-    ("Xerez CD vs Antoniano", "Segunda RFEF - Gr. 4", "Victoria Xerez CD", 2.05, "El empuje de Chapín y la necesidad de puntos del Xerez harán valer la superioridad técnica del conjunto local."),
-    ("CD Toledo vs CD Marchamalo", "Tercera RFEF - Gr. 18", "Más de 2.5 Goles Totales", 2.15, "El Toledo genera múltiples ocasiones claras en el Salto del Caballo y el Marchamalo destaca por partidos abiertos.")
-]
+def generate_gemini_analysis(match_name, league, pick, odds):
+    """Genera un análisis experto utilizando la IA de Gemini."""
+    if not GEMINI_API_KEY:
+        return f"Analizando los patrones tácticos de {league}, la dinámica de ambos planteles refleja una clara superioridad en generación de ocasiones. {match_name} presenta las condiciones óptimas para buscar esta selección a cuota {odds:.2f} en Bet365."
+    
+    prompt = f"""
+    Actúa como un tipster analista de fútbol profesional para el canal de Telegram @FreeTopTip.
+    Redacta un análisis en primera persona (hablando yo como experto) muy detallado y técnico.
+    
+    Partido: {match_name}
+    Competición: {league}
+    Pronóstico / Selección: {pick}
+    Cuota Bet365: {odds}
+    
+    Requisitos:
+    - Habla en primera persona ("He analizado", "Viendo el volumen de disparos...", "Me inclino por...").
+    - Explica razones tácticas reales: intensidad en campo contrario, saques de esquina, faltas, transición ofensiva o volumen de xG.
+    - Longitud: 3 a 5 frases potentes y profesionales.
+    - No agregues saludos ni despedidas, únicamente el texto del análisis.
+    """
+    
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+        res = requests.post(url, headers=headers, json=payload, timeout=12)
+        data = res.json()
+        if "candidates" in data and len(data["candidates"]) > 0:
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        else:
+            logging.error(f"Respuesta inesperada de Gemini API: {data}")
+            return f"Tras revisar las estadísticas avanzadas y el volumen ofensivo en {league}, detectamos un valor claro en esta opción para {match_name} a cuota {odds:.2f}."
+    except Exception as e:
+        logging.error(f"Error llamando a la API de Gemini: {e}")
+        return f"Tras revisar las estadísticas avanzadas y el volumen ofensivo en {league}, detectamos un valor claro en esta opción para {match_name} a cuota {odds:.2f}."
 
-# --- PUBLICACIONES GENERALES Y INTERNACIONALES ---
-GLOBAL_MATCHES = [
-    ("Real Madrid vs Barcelona", "La Liga EA Sports", "Victoria Real Madrid + Más de 1.5 Goles", 2.35, "Análisis de máxima exigencia: la profundidad de banquillo y la pegada del Madrid en las áreas inclinarán la balanza en el tramo final."),
-    ("Arsenal vs Chelsea", "Premier League", "Más de 9.5 Córneres Totales", 1.90, "Propuestas ofensivas de juego exterior constante por bandas que garantizan un goteo continuo de saques de esquina."),
-    ("Bayern Múnich vs Borussia Dortmund", "Bundesliga", "Ambos Anotan + Más de 2.5 Goles", 1.85, "Derby alemán caracterizado por defensas adelantadas e intercambios de golpes constantes a alta velocidad."),
-    ("Inter de Milán vs Juventus", "Serie A", "Más de 4.5 Tarjetas Totales", 1.95, "Duelo de máxima rivalidad táctica con alta densidad de faltas tácticas en la medular y exigencia arbitral.")
-]
-
-def publish_single_pick(match_info):
-    home_away, league, pick, odds, analysis = match_info
+def publish_pick(match_title, league_name, pick_text, odds_val):
+    analysis_text = generate_gemini_analysis(match_title, league_name, pick_text, odds_val)
     
     caption = (
-        f"⚽ <b>ANÁLISIS PROFESIONAL DETALLADO - TOPTIPS</b> ⚽\n\n"
-        f"🏆 <b>Competición:</b> {league}\n"
-        f"⚔️ <b>Encuentro:</b> {home_away}\n\n"
-        f"🎯 <b>SELECCIÓN RECOMENDADA:</b>\n"
-        f"• Pronóstico: <code>{pick}</code>\n"
-        f"• Cuota Real (Bet365): <b>{odds:.2f}</b>\n"
+        f"⚽ <b>ANÁLISIS DE VALOR Y PRONÓSTICO - @FreeTopTip</b> ⚽\n\n"
+        f"🏆 <b>Competición:</b> {league_name}\n"
+        f"⚔️ <b>Encuentro:</b> {match_title}\n\n"
+        f"🎯 <b>SELECCIÓN RECOMENDADA (BET365):</b>\n"
+        f"• Pronóstico: <code>{pick_text}</code>\n"
+        f"• Cuota Real: <b>{odds_val:.2f}</b>\n"
         f"• Stake Sugerido: <b>1.5 / 10</b>\n\n"
-        f"🔎 <b>MI ANÁLISIS DEL PARTIDO:</b>\n"
-        f"💬 {analysis}\n\n"
-        f"📊 <b>BALANCES:</b> +{CHANNEL_STATS['profit_units']} U. Neto\n"
-        f"📲 <b>Suscripciones VIP:</b> @{TELEGRAM_USERNAME}"
+        f"🔎 <b>MI ANÁLISIS DETALLADO DEL PARTIDO:</b>\n"
+        f"💬 {analysis_text}\n\n"
+        f"📊 <b>BALANCE DEL CANAL:</b> +{CHANNEL_STATS['profit_units']} Unidades de Beneficio\n\n"
+        f"💳 <b>¿QUIERES ACCEDER A TODAS LAS COMBINADAS VIP?</b>\n"
+        f"📲 Escríbeme directamente por privado: <b>@{TELEGRAM_USERNAME}</b>"
     )
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Contactar al Analista VIP", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
+            [{"text": "👑 Comprar Pase VIP / Contactar al Analista", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
         ]
     }
 
-    img_path = create_scores24_card(home_away, league, pick, odds)
+    img_path = create_scores24_card(match_title, league_name, pick_text, odds_val)
     sent = False
     if img_path:
         sent = send_telegram_photo(img_path, caption, reply_markup=keyboard)
     if not sent:
         send_telegram_message(caption, reply_markup=keyboard)
 
+def send_daily_sales_message():
+    now_spain = datetime.now(SPAIN_TZ)
+    weekday = now_spain.weekday()
+    
+    if weekday in [4, 5, 6]: # Viernes, Sábado, Domingo
+        msg = (
+            "☀️ <b>¡BUENOS DÍAS A TODOS EN @FreeTopTip!</b> ☀️\n\n"
+            "☕ Arrancamos una jornada cargada de análisis en ligas europeas, sudamericanas e internacionales.\n\n"
+            "💳 <b>TARIFAS GRUPO VIP PRIVADO:</b>\n"
+            "🔥 <b>Pase Día Premium:</b> <b>5.00 €</b>\n"
+            "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
+            "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
+            f"📲 <i>Escríbeme por privado para entrar al Grupo VIP:</i>\n"
+            f"👉 <b>Contactar al Analista: @{TELEGRAM_USERNAME}</b>"
+        )
+    else: # Lunes a Jueves
+        msg = (
+            "☀️ <b>¡BUENOS DÍAS A TODOS! JORNADA DE VALOR GLOBAL</b> ☀️\n\n"
+            "☕ Tenemos preparadas las mejores selecciones tras filtrar mercados de Champions, ligas sudamericanas y competiciones asiáticas.\n\n"
+            "💳 <b>ACCESO AL GRUPO VIP TOPTIPS:</b>\n"
+            "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
+            "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
+            f"📲 <i>Para unirte al VIP y recibir la combinada exclusiva de hoy, escríbeme:</i>\n"
+            f"👉 <b>Escribir al Analista: @{TELEGRAM_USERNAME}</b>"
+        )
+    
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "👑 Entrar al Grupo VIP", "url": f"https://t.me/{TELEGRAM_USERNAME}"}]
+        ]
+    }
+    send_telegram_message(msg, reply_markup=keyboard)
+
+ALL_GLOBAL_PICKS = [
+    # Champions / Europa League (BetBuilder)
+    ("Galatasaray vs FC Barcelona", "UEFA Champions League", "Crear Apuesta: Victoria FC Barcelona + Más de 8.5 Córneres + Ambos Anotan", 2.35),
+    ("Arsenal vs Lille", "UEFA Champions League", "Crear Apuesta: Victoria Arsenal + Más de 1.5 Goles + Más de 4.5 Córneres Arsenal", 2.10),
+    ("Athletic Club vs AS Roma", "UEFA Europa League", "Crear Apuesta: Doble Oportunidad Athletic/Empate + Más de 8.5 Córneres + Más de 4.5 Tarjetas", 2.25),
+    
+    # Ligas Menores Europeas
+    ("AZ Alkmaar vs FC Utrecht", "Eredivisie (Países Bajos)", "Más de 2.5 Goles Totales + Ambos Anotan (Sí)", 2.05),
+    ("Sporting CP vs SC Braga", "Primeira Liga (Portugal)", "Crear Apuesta: Victoria Sporting CP + Más de 1.5 Goles + Más de 7.5 Córneres", 2.15),
+    ("Bodø/Glimt vs Molde FK", "Eliteserien (Noruega)", "Ambos Anotan (Sí) + Más de 8.5 Córneres", 2.00),
+    
+    # Sudamérica
+    ("Boca Juniors vs River Plate", "Liga Profesional Argentina", "Más de 5.5 Tarjetas Totales + Doble Oportunidad Boca/Empate", 2.20),
+    ("Flamengo vs Palmeiras", "Brasileirão Serie A", "Ambos Anotan (Sí) + Más de 1.5 Goles Totales", 2.05),
+    ("Millonarios vs Atlético Nacional", "Liga BetPlay (Colombia)", "Más de 4.5 Tarjetas + Más de 7.5 Córneres", 2.10),
+    
+    # Asia y Australia
+    ("Al Hilal vs Al Nassr", "Saudi Pro League", "Crear Apuesta: Más de 2.5 Goles + Ambos Anotan + Más de 8.5 Córneres", 2.25),
+    ("Kawasaki Frontale vs Yokohama Marinos", "J1 League (Japón)", "Más de 2.5 Goles Totales", 2.00),
+    ("Sydney FC vs Melbourne Victory", "A-League (Australia)", "Crear Apuesta: Ambos Anotan + Más de 9.5 Córneres Totales", 2.15)
+]
+
+def run_daily_routine():
+    send_daily_sales_message()
+    time.sleep(3)
+    
+    selected_picks = random.sample(ALL_GLOBAL_PICKS, min(5, len(ALL_GLOBAL_PICKS)))
+    
+    for match, league, pick, odds in selected_picks:
+        publish_pick(match, league, pick, odds)
+        time.sleep(4)
+
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        self.wfile.write("Bot Vendedor Pro TOPTIPS Activo".encode('utf-8'))
+        self.wfile.write("Bot Tipster Inteligente Gemini Activo".encode('utf-8'))
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
     try:
         HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler).serve_forever()
     except Exception as e:
-        logging.error(f"Error HTTP: {e}")
-
-def run_sunday_morning_pack():
-    msg = (
-        "☀️ <b>¡BUENOS DÍAS Y FELIZ DOMINGO DE FÚTBOL!</b> ☀️\n\n"
-        "☕ Arrancamos el día más importante de la semana con la mejor información del mercado.\n\n"
-        "💳 <b>TARIFAS PREMIUM PARA LA JORNADA DEL DOMINGO:</b>\n"
-        "🔥 <b>Pase Día Premium Domingo:</b> <b>5.00 €</b> (Acceso total a la jornada de hoy)\n"
-        "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
-        "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
-        f"📲 Escríbeme directamente para entrar al grupo VIP: <b>@{TELEGRAM_USERNAME}</b>"
-    )
-    send_telegram_message(msg)
-    time.sleep(2)
-    logging.info("Enviando pack de RFEF...")
-    for match in RFEF_MATCHES[:10]:
-        publish_single_pick(match)
-        time.sleep(2)
+        logging.error(f"Error servidor HTTP: {e}")
 
 def main():
     threading.Thread(target=run_http_server, daemon=True).start()
-    logging.info("Servicio Tipster Pro en ejecución con Hora de España (Europe/Madrid)...")
+    logging.info("Servicio Tipster Inteligente Gemini en ejecución...")
 
-    executed_tasks = set()
+    # Ejecutar al arrancar para publicar de inmediato
+    run_daily_routine()
+
+    last_executed_day = -1
 
     while True:
         try:
             now_spain = datetime.now(SPAIN_TZ)
-            weekday = now_spain.weekday() # 0: Lunes, 4: Viernes, 5: Sábado, 6: Domingo
-            hour = now_spain.hour
-            minute = now_spain.minute
-            date_str = now_spain.strftime("%Y-%m-%d")
+            current_day = now_spain.day
+            current_hour = now_spain.hour
 
-            # --- DOMINGO (6) ---
-            if weekday == 6:
-                # Publicación combinada especial para HOY a las 10:00 AM (Buenos Días + 10 Picks RFEF)
-                task_id_10 = f"{date_str}_sun_1000_combined"
-                if hour == 10 and minute == 0 and task_id_10 not in executed_tasks:
-                    logging.info("Lanzando publicación combinada de las 10:00 AM...")
-                    run_sunday_morning_pack()
-                    executed_tasks.add(task_id_10)
-
-                # 08:00 - Buenos Días Domingo (Para domingos futuros)
-                task_id = f"{date_str}_sun_0800"
-                if hour == 8 and minute == 0 and task_id not in executed_tasks:
-                    msg = (
-                        "☀️ <b>¡BUENOS DÍAS Y FELIZ DOMINGO DE FÚTBOL!</b> ☀️\n\n"
-                        "☕ Arrancamos el día más importante de la semana con la mejor información del mercado.\n\n"
-                        "💳 <b>TARIFAS PREMIUM PARA LA JORNADA DEL DOMINGO:</b>\n"
-                        "🔥 <b>Pase Día Premium Domingo:</b> <b>5.00 €</b> (Acceso total a la jornada de hoy)\n"
-                        "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
-                        "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
-                        f"📲 Escríbeme directamente para entrar al grupo VIP: <b>@{TELEGRAM_USERNAME}</b>"
-                    )
-                    send_telegram_message(msg)
-                    executed_tasks.add(task_id)
-
-                # 08:30 - Pack 10 RFEF (Para domingos futuros)
-                task_id = f"{date_str}_sun_0830"
-                if hour == 8 and minute == 30 and task_id not in executed_tasks:
-                    for match in RFEF_MATCHES[:10]:
-                        publish_single_pick(match)
-                        time.sleep(2)
-                    executed_tasks.add(task_id)
-
-                # 12:00 - Pack 3 Matinales
-                task_id = f"{date_str}_sun_1200"
-                if hour == 12 and minute == 0 and task_id not in executed_tasks:
-                    for match in GLOBAL_MATCHES[:3]:
-                        publish_single_pick(match)
-                        time.sleep(2)
-                    executed_tasks.add(task_id)
-
-                # 14:30 - Pack 10 Tarde
-                task_id = f"{date_str}_sun_1430"
-                if hour == 14 and minute == 30 and task_id not in executed_tasks:
-                    for match in (GLOBAL_MATCHES + RFEF_MATCHES)[:10]:
-                        publish_single_pick(match)
-                        time.sleep(2)
-                    executed_tasks.add(task_id)
-
-            # --- VIERNES (4) ---
-            elif weekday == 4:
-                task_id = f"{date_str}_fri_0800"
-                if hour == 8 and minute == 0 and task_id not in executed_tasks:
-                    msg = (
-                        "☀️ <b>¡BUENOS DÍAS! LLEGA EL FIN DE SEMANA</b> ☀️\n\n"
-                        "💳 <b>TARIFAS ESPECIALES FIN DE SEMANA:</b>\n"
-                        "⚡ <b>Día Premium Viernes:</b> <b>5.00 €</b>\n"
-                        "🔥 <b>Jornada Completa (Viernes a Domingo):</b> <b>9.99 €</b>\n"
-                        "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
-                        f"📲 Contáctame para unirte ahora: <b>@{TELEGRAM_USERNAME}</b>"
-                    )
-                    send_telegram_message(msg)
-                    executed_tasks.add(task_id)
-
-                task_id = f"{date_str}_fri_1200"
-                if hour == 12 and minute == 0 and task_id not in executed_tasks:
-                    for match in GLOBAL_MATCHES[:2]:
-                        publish_single_pick(match)
-                        time.sleep(2)
-                    executed_tasks.add(task_id)
-
-            # --- SÁBADO (5) ---
-            elif weekday == 5:
-                task_id = f"{date_str}_sat_0800"
-                if hour == 8 and minute == 0 and task_id not in executed_tasks:
-                    msg = (
-                        "☀️ <b>¡BUENOS DÍAS! JORNADA FUERTE DE SÁBADO</b> ☀️\n\n"
-                        "💳 <b>TARIFAS GRUPO VIP SÁBADO:</b>\n"
-                        "🔥 <b>Pase Día Premium Sábado:</b> <b>10.00 €</b>\n"
-                        "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
-                        "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
-                        f"📲 Escríbeme para unirte al VIP: <b>@{TELEGRAM_USERNAME}</b>"
-                    )
-                    send_telegram_message(msg)
-                    executed_tasks.add(task_id)
-
-                task_id = f"{date_str}_sat_1100"
-                if hour == 11 and minute == 0 and task_id not in executed_tasks:
-                    for match in GLOBAL_MATCHES[:3]:
-                        publish_single_pick(match)
-                        time.sleep(2)
-                    executed_tasks.add(task_id)
-
-            # --- LUNES A JUEVES (0, 1, 2, 3) ---
-            else:
-                task_id = f"{date_str}_weekday_0800"
-                if hour == 8 and minute == 0 and task_id not in executed_tasks:
-                    msg = (
-                        "☀️ <b>¡BUENOS DÍAS A TODOS!</b> ☀️\n\n"
-                        "☕ Arrancamos la jornada analizando las mejores oportunidades del día.\n\n"
-                        "💳 <b>TARIFAS GRUPO VIP:</b>\n"
-                        "🎟️ <b>Pase Semanal VIP:</b> <b>10.00 €</b>\n"
-                        "👑 <b>Pase Mensual VIP:</b> <b>34.99 €</b>\n\n"
-                        f"📲 Escríbeme para unirte: <b>@{TELEGRAM_USERNAME}</b>"
-                    )
-                    send_telegram_message(msg)
-                    executed_tasks.add(task_id)
-
-                task_id = f"{date_str}_weekday_1200"
-                if hour == 12 and minute == 0 and task_id not in executed_tasks:
-                    for match in GLOBAL_MATCHES[:3]:
-                        publish_single_pick(match)
-                        time.sleep(2)
-                    executed_tasks.add(task_id)
+            if current_day != last_executed_day and current_hour == 8:
+                run_daily_routine()
+                last_executed_day = current_day
 
         except Exception as e:
             logging.error(f"Error en bucle principal: {e}")
 
-        time.sleep(15) # Comprobación constante cada 15 segundos
+        time.sleep(30)
 
 if __name__ == "__main__":
     main()
