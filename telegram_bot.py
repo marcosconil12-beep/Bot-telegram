@@ -18,7 +18,9 @@ logging.basicConfig(
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+# Leemos la clave de forma explícita de las variables de entorno de Railway
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "d6abc7c413mshf80c5e16b6760bcp14e3f9jsnf2c34103db6c")
 FOOTBALL_DATA_API_KEY = os.environ.get("FOOTBALL_DATA_API_KEY", "d406243cc58144269f85bfe80f4e79b3")
@@ -26,7 +28,7 @@ FOOTBALL_DATA_API_KEY = os.environ.get("FOOTBALL_DATA_API_KEY", "d406243cc581442
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # ---------------------------------------------------------
-# Cliente de Gemini AI
+# Cliente de Gemini AI (Forzado con la clave del entorno)
 # ---------------------------------------------------------
 ai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
@@ -52,14 +54,13 @@ def fetch_global_matches_rapidapi() -> list:
         "X-RapidAPI-Host": "flashlive-sports.p.rapidapi.com"
     }
     
-    # Consultamos día de ayer (-1), hoy (0) y mañana (1) con timezone=2 para no perder partidos de madrugada
     for day in [-1, 0, 1]:
         try:
             params = {
                 "sport_id": "1", 
                 "indent_days": str(day), 
                 "locale": "es_ES",
-                "timezone": "2"  # Parámetro obligatorio para ajustar a hora CEST/CEST+1
+                "timezone": "2"
             }
             res = requests.get(url, headers=headers, params=params, timeout=12)
             if res.status_code == 200:
@@ -98,7 +99,6 @@ def search_match_by_query(query: str) -> list:
     all_matches = fetch_global_matches_rapidapi()
     q = query.lower().strip()
     
-    # Mapeo flexible de sinónimos y alias de ligas
     aliases = {
         "mls": ["usa", "major league", "mls"],
         "europa league": ["europa league", "uel", "europa"],
@@ -129,7 +129,7 @@ def generate_scores24_morning_report(matches: list) -> str:
     date_str = datetime.now(SPAIN_TZ).strftime("%d/%m/%Y")
     
     if not matches:
-        return f"☀️ <b>Buenos días equipo de @FreeTopTip</b> ({date_str})\n\nNo se registran encuentros de primera línea en este momento. ¡Atentos a las próximas publicaciones!"
+        return f"☀️ <b>Buenos días equipo de @FreeTopTip</b> ({date_str})\n\nNo se registran encuentros en este momento. ¡Atentos a las próximas publicaciones!"
 
     context_text = f"Fecha: {date_str}\nLista de partidos reales confirmados:\n"
     for m in matches[:6]:
@@ -137,13 +137,13 @@ def generate_scores24_morning_report(matches: list) -> str:
 
     prompt = f"""
     Actúa como un analista profesional de fútbol estilo Scores24 para el canal de Telegram @FreeTopTip.
-    Usa la lista de partidos reales proporcionada.
+    Usa estrictamente la lista de partidos reales proporcionada.
 
     Escribe un post para el canal con este formato HTML estricto:
 
     ☀️ <b>BUENOS DÍAS EQUIPO | CARTELERA Y ANÁLISIS ({date_str})</b> ☀️
 
-    [Breve saludo de 2 líneas]
+    [Breve saludo de 2 líneas enfocado a la comunidad]
 
     A continuación, desglosa los partidos principales:
 
@@ -152,7 +152,7 @@ def generate_scores24_morning_report(matches: list) -> str:
     📊 <b>Promedio de goles:</b> [xG estimado]
     📈 <b>Racha reciente:</b> [Local vs Visitante]
     🎯 <b>Pronóstico Scores24:</b> [Mercado] | 🎲 <b>Probabilidad:</b> [%]
-    💡 <b>Análisis táctico:</b> [Explicación de 2 líneas].
+    💡 <b>Análisis táctico:</b> [Explicación detallada en primera persona].
 
     Contacto VIP con @Mark122.
     """
@@ -160,13 +160,14 @@ def generate_scores24_morning_report(matches: list) -> str:
     if ai_client:
         try:
             response = ai_client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-2.5-flash',
                 contents=f"{context_text}\n\n{prompt}"
             )
             return response.text.strip()
         except Exception as e:
             logging.error(f"Error generando reporte con Gemini: {e}")
 
+    # Texto de respaldo en caso excepcional de fallo de API
     report = f"☀️ <b>BUENOS DÍAS EQUIPO ({date_str})</b> ☀️\n\n"
     for m in matches[:4]:
         report += f"🏆 <b>{m['league']}</b>\n⏰ <b>Hora:</b> {m['time']} | ⚔️ <b>{m['match']}</b>\n🎯 <b>Pronóstico:</b> Ambos Anotan | 🎲 <b>Probabilidad:</b> 65%\n\n"
@@ -176,31 +177,31 @@ def generate_scores24_morning_report(matches: list) -> str:
 def generate_single_match_analysis(match_info: dict) -> str:
     prompt = f"""
     Actúa como un analista profesional de fútbol estilo Scores24 para @FreeTopTip.
-    Analiza este partido real:
+    Analiza este partido real en primera persona:
     Liga: {match_info['league']}
     Partido: {match_info['match']}
     Hora: {match_info['time']}
 
-    Genera una respuesta en HTML estricto para Telegram:
+    Genera una respuesta detallada en formato HTML estricto para Telegram:
     🏆 <b>{match_info['league']}</b>
     ⏰ <b>Hora:</b> {match_info['time']} | ⚔️ <b>{match_info['match']}</b>
 
-    📊 <b>Promedio de goles estimado:</b> [Dato]
+    📊 <b>Promedio de goles estimado:</b> [Dato analítico]
     📈 <b>Racha reciente:</b> [Local vs Visitante]
-    ⚔️ <b>H2H histórico:</b> [Resumen]
+    ⚔️ <b>H2H histórico:</b> [Resumen de duelos]
     🎯 <b>Pronóstico Scores24:</b> [Pick de valor] | 🎲 <b>Confianza:</b> [%]
-    💡 <b>Análisis detallado:</b> [2 párrafos breves explicando xG, bajas y propuesta táctica en primera persona].
+    💡 <b>Análisis detallado:</b> [2 párrafos profesionales redactados en primera persona explicando xG, dinámicas y planteamiento táctico].
     """
 
     if ai_client:
         try:
             res = ai_client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-2.5-flash',
                 contents=prompt
             )
             return res.text.strip()
         except Exception as e:
-            logging.error(f"Error analizando partido individual: {e}")
+            logging.error(f"Error analizando partido individual con Gemini: {e}")
 
     return (
         f"🏆 <b>{match_info['league']}</b>\n"
@@ -216,12 +217,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 <b>¡Bienvenido al Bot de @FreeTopTip (Estilo Scores24)!</b>\n\n"
         "Comandos disponibles:\n"
         "• /buenosdias - Envía el informe matutino con la cartelera real de hoy.\n"
-        "• /buscar [equipo o liga] - Ejemplo: <code>/buscar mls</code> o <code>/buscar Inter</code>"
+        "• /buscar [equipo o liga] - Ejemplo: <code>/buscar mls</code> o <code>/buscar Real Madrid</code>"
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
 async def morning_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔄 Consultando eventos globales y generando informe con Gemini...")
+    await update.message.reply_text("🔄 Consultando eventos globales y generando análisis profesional con Gemini...")
     matches = fetch_global_matches_rapidapi()
     report = generate_scores24_morning_report(matches)
     await update.message.reply_text(report, parse_mode="HTML", disable_web_page_preview=True)
@@ -232,14 +233,14 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     query = " ".join(context.args)
-    await update.message.reply_text(f"🔍 Buscando partidos en tiempo real para <b>{query}</b>...", parse_mode="HTML")
+    await update.message.reply_text(f"🔍 Buscando partidos y generando análisis inteligente para <b>{query}</b>...", parse_mode="HTML")
 
     results = search_match_by_query(query)
     if not results:
         await update.message.reply_text(f"❌ No se encontraron partidos programados para '<b>{query}</b>' en las próximas horas. Prueba buscando por el nombre de un equipo.", parse_mode="HTML")
         return
 
-    for match in results[:3]:  # Muestra hasta 3 resultados
+    for match in results[:3]:
         analysis = generate_single_match_analysis(match)
         await update.message.reply_text(analysis, parse_mode="HTML", disable_web_page_preview=True)
 
@@ -249,10 +250,8 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Registro de manejador de errores de red
     application.add_error_handler(error_handler)
 
-    # Handlers de comandos
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("buenosdias", morning_report_command))
     application.add_handler(CommandHandler("buscar", search_command))
