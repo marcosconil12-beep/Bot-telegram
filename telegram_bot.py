@@ -4,7 +4,7 @@ import logging
 import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from google import genai
+import google.generativeai as genai
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
@@ -26,9 +26,13 @@ FOOTBALL_DATA_API_KEY = os.environ.get("FOOTBALL_DATA_API_KEY", "d406243cc581442
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # ---------------------------------------------------------
-# Cliente de Gemini AI
+# Configuración del Cliente Gemini (Librería Estable)
 # ---------------------------------------------------------
-ai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    ai_model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    ai_model = None
 
 # ---------------------------------------------------------
 # Manejador Global de Errores
@@ -115,7 +119,7 @@ def search_match_by_query(query: str) -> list:
     return results
 
 # ---------------------------------------------------------
-# Análisis con Gemini API (Modelo Corregido: gemini-1.5-flash)
+# Análisis con Gemini API (Librería Estable)
 # ---------------------------------------------------------
 def generate_single_match_analysis(match_info: dict) -> str:
     prompt = f"""
@@ -136,22 +140,19 @@ def generate_single_match_analysis(match_info: dict) -> str:
     💡 <b>Análisis detallado:</b> [2 párrafos profesionales redactados en primera persona explicando xG, dinámicas y planteamiento táctico].
     """
 
-    if ai_client:
+    if ai_model:
         try:
-            res = ai_client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=prompt
-            )
-            if res and res.text:
-                return res.text.strip()
+            response = ai_model.generate_content(prompt)
+            if response and response.text:
+                return response.text.strip()
         except Exception as e:
-            logging.error(f"Error detallado de Gemini AI: {e}")
-            return f"🏆 <b>{match_info['league']}</b>\n⏰ <b>Hora:</b> {match_info['time']} | ⚔️ <b>{match_info['match']}</b>\n\n💡 <b>Error API Gemini:</b> <code>{str(e)}</code>"
+            logging.error(f"Error de Gemini AI: {e}")
+            return f"🏆 <b>{match_info['league']}</b>\n⏰ <b>Hora:</b> {match_info['time']} | ⚔️ <b>{match_info['match']}</b>\n\n💡 <b>Error IA:</b> <code>{str(e)}</code>"
 
     return (
         f"🏆 <b>{match_info['league']}</b>\n"
         f"⏰ <b>Hora:</b> {match_info['time']} | ⚔️ <b>{match_info['match']}</b>\n\n"
-        f"💡 <b>Análisis Scores24:</b> Error: Cliente de IA no inicializado."
+        f"💡 <b>Análisis Scores24:</b> Clave de API no configurada."
     )
 
 def generate_scores24_morning_report(matches: list) -> str:
@@ -165,12 +166,9 @@ def generate_scores24_morning_report(matches: list) -> str:
 
     prompt = f"Actúa como analista Scores24 para Telegram. Redacta un reporte matutino breve y profesional en HTML basado en:\n{context_text}"
 
-    if ai_client:
+    if ai_model:
         try:
-            response = ai_client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=prompt
-            )
+            response = ai_model.generate_content(prompt)
             if response and response.text:
                 return response.text.strip()
         except Exception as e:
