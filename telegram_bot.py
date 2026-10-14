@@ -2,7 +2,7 @@ import os
 import time
 import logging
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 from google import genai
 from telegram import Update
@@ -41,7 +41,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 # PASO A: Consulta Global de Partidos (Cualquier liga del mundo)
 # ---------------------------------------------------------
 def fetch_global_matches_rapidapi() -> list:
-    """Consulta FlashLive/RapidAPI cubriendo TODAS las ligas del mundo."""
+    """Consulta FlashLive/RapidAPI cubriendo TODAS las ligas del mundo con timezone correcto."""
     matches = []
     if not RAPIDAPI_KEY:
         return matches
@@ -52,17 +52,22 @@ def fetch_global_matches_rapidapi() -> list:
         "X-RapidAPI-Host": "flashlive-sports.p.rapidapi.com"
     }
     
-    # Consulta día de hoy (0) y próximo día (1) para abarcar madrugadas/MLS
-    for day in ["0", "1"]:
+    # Consultamos día de ayer (-1), hoy (0) y mañana (1) con timezone=2 para no perder partidos de madrugada
+    for day in [-1, 0, 1]:
         try:
-            params = {"sport_id": "1", "indent_days": day, "locale": "es_ES"}
-            res = requests.get(url, headers=headers, params=params, timeout=10)
+            params = {
+                "sport_id": "1", 
+                "indent_days": str(day), 
+                "locale": "es_ES",
+                "timezone": "2"  # Parámetro obligatorio para ajustar a hora CEST/CEST+1
+            }
+            res = requests.get(url, headers=headers, params=params, timeout=12)
             if res.status_code == 200:
                 data = res.json()
                 for tournament in data.get("DATA", []):
                     league_name = tournament.get("NAME", tournament.get("TOURNAMENT_NAME", "Liga Internacional"))
                     country = tournament.get("COUNTRY_NAME", "Global")
-                    full_league = f"{country.upper()} - {league_name.upper()}"
+                    full_league = f"{country} - {league_name}".upper()
                     
                     for ev in tournament.get("EVENTS", []):
                         home = ev.get("HOME_NAME", "")
@@ -93,16 +98,27 @@ def search_match_by_query(query: str) -> list:
     all_matches = fetch_global_matches_rapidapi()
     q = query.lower().strip()
     
-    # Mapeo de alias comunes
-    if q == "mls":
-        q = "usa"
-    elif q in ["europa league", "uel"]:
-        q = "europa"
+    # Mapeo flexible de sinónimos y alias de ligas
+    aliases = {
+        "mls": ["usa", "major league", "mls"],
+        "europa league": ["europa league", "uel", "europa"],
+        "champions": ["champions", "ucl"],
+        "premier": ["premier", "england", "inglaterra"],
+        "laliga": ["spain", "españa", "la liga", "laliga"],
+        "serie a": ["italy", "italia", "serie a"],
+        "bundesliga": ["germany", "alemania", "bundesliga"]
+    }
+
+    search_terms = aliases.get(q, [q])
     
     results = []
+    seen = set()
     for m in all_matches:
-        if q in m["home"].lower() or q in m["away"].lower() or q in m["league"].lower():
-            results.append(m)
+        match_text = f"{m['home']} {m['away']} {m['league']}".lower()
+        if any(term in match_text for term in search_terms):
+            if m["match"] not in seen:
+                seen.add(m["match"])
+                results.append(m)
             
     return results
 
