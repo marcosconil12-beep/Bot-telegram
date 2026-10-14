@@ -1,8 +1,9 @@
 import os
+import time
 import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
 import requests
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from google import genai
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -15,14 +16,12 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Carga de variables de entorno desde Railway / Entorno local
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "TU_TELEGRAM_BOT_TOKEN")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "TU_GEMINI_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-# Credenciales de API de Fútbol
-FOOTBALL_DATA_API_KEY = os.environ.get("FOOTBALL_DATA_API_KEY", "d406243cc58144269f85bfe80f4e79b3")
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "d6abc7c413mshf80c5e16b6760bcp14e3f9jsnf2c34103db6c")
+FOOTBALL_DATA_API_KEY = os.environ.get("FOOTBALL_DATA_API_KEY", "d406243cc58144269f85bfe80f4e79b3")
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
@@ -32,62 +31,32 @@ SPAIN_TZ = ZoneInfo("Europe/Madrid")
 ai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 # ---------------------------------------------------------
-# PASO A: Consulta a la API de Fútbol en tiempo real
+# PASO A: Consulta Global de Partidos (Cualquier liga del mundo)
 # ---------------------------------------------------------
-def get_today_matches_realtime() -> list:
-    """
-    Consulta partidos reales programados para el día de hoy usando Football-Data.org.
-    Si no devuelve partidos, consulta FlashLive via RapidAPI.
-    """
-    today_str = datetime.now(SPAIN_TZ).strftime("%Y-%m-%d")
+def fetch_global_matches_rapidapi() -> list:
+    """Consulta FlashLive/RapidAPI cubriendo TODAS las ligas del mundo (MLS, Europa League, etc.)"""
     matches = []
+    if not RAPIDAPI_KEY:
+        return matches
 
-    # 1. Intento con Football-Data.org
-    if FOOTBALL_DATA_API_KEY:
+    url = "https://flashlive-sports.p.rapidapi.com/v1/events/list"
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": "flashlive-sports.p.rapidapi.com"
+    }
+    
+    # Consultamos día de hoy (0) y próximo día (1) para capturar la madrugada/MLS
+    for day in ["0", "1"]:
         try:
-            url = f"https://api.football-data.org/v4/matches?dateFrom={today_str}&dateTo={today_str}"
-            headers = {"X-Auth-Token": FOOTBALL_DATA_API_KEY}
-            res = requests.get(url, headers=headers, timeout=12)
-            if res.status_code == 200:
-                data = res.json()
-                for match in data.get("matches", []):
-                    home = match["homeTeam"]["name"]
-                    away = match["awayTeam"]["name"]
-                    league = match["competition"]["name"]
-                    match_utc = match.get("utcDate", "")
-                    
-                    if match_utc:
-                        dt_utc = datetime.fromisoformat(match_utc.replace("Z", "+00:00"))
-                        match_time = dt_utc.astimezone(SPAIN_TZ).strftime("%H:%M")
-                    else:
-                        match_time = "Por definir"
-
-                    matches.append({
-                        "league": league,
-                        "home": home,
-                        "away": away,
-                        "match": f"{home} vs {away}",
-                        "time": f"{match_time} CEST"
-                    })
-        except Exception as e:
-            logging.error(f"Error consultando Football-Data.org: {e}")
-
-    # 2. Respaldo con RapidAPI (FlashLive Sports) si la primera API no devolvió partidos
-    if not matches and RAPIDAPI_KEY:
-        try:
-            url = "https://flashlive-sports.p.rapidapi.com/v1/events/list"
-            headers = {
-                "X-RapidAPI-Key": RAPIDAPI_KEY,
-                "X-RapidAPI-Host": "flashlive-sports.p.rapidapi.com"
-            }
-            params = {"sport_id": "1", "indent_days": "0", "locale": "es_ES"}
-            res = requests.get(url, headers=headers, params=params, timeout=12)
+            params = {"sport_id": "1", "indent_days": day, "locale": "es_ES"}
+            res = requests.get(url, headers=headers, params=params, timeout=10)
             if res.status_code == 200:
                 data = res.json()
                 for tournament in data.get("DATA", []):
                     league_name = tournament.get("NAME", tournament.get("TOURNAMENT_NAME", "Liga Internacional"))
-                    country = tournament.get("COUNTRY_NAME", "")
-                    full_league = f"{country} - {league_name}".strip(" -")
+                    country = tournament.get("COUNTRY_NAME", "Global")
+                    full_league = f"{country.upper()} - {league_name.upper()}"
+                    
                     for ev in tournament.get("EVENTS", []):
                         home = ev.get("HOME_NAME", "")
                         away = ev.get("AWAY_NAME", "")
@@ -97,66 +66,72 @@ def get_today_matches_realtime() -> list:
                                 m_time = datetime.fromtimestamp(start_ts, SPAIN_TZ).strftime("%H:%M") + " CEST"
                             else:
                                 m_time = "Por definir"
+                                
+                            is_live = ev.get("STAGE_TYPE") == "LIVE" or ev.get("TIME_RUNNING", False)
+                            
                             matches.append({
                                 "league": full_league,
                                 "home": home,
                                 "away": away,
                                 "match": f"{home} vs {away}",
-                                "time": m_time
+                                "time": "🔴 EN DIRECTO (LIVE)" if is_live else m_time
                             })
         except Exception as e:
-            logging.error(f"Error consultando RapidAPI FlashLive: {e}")
+            logging.error(f"Error consultando RapidAPI en día {day}: {e}")
 
     return matches
 
 def search_match_by_query(query: str) -> list:
-    """Filtra partidos reales de la jornada que coincidan con la búsqueda del usuario."""
-    all_matches = get_today_matches_realtime()
-    query_lower = query.lower()
-    results = [
-        m for m in all_matches 
-        if query_lower in m["home"].lower() or query_lower in m["away"].lower() or query_lower in m["league"].lower()
-    ]
+    """Filtra y busca partidos de cualquier liga mundial por texto de búsqueda"""
+    all_matches = fetch_global_matches_rapidapi()
+    q = query.lower().strip()
+    
+    # Mapeo de alias comunes
+    if q == "mls":
+        q = "usa"
+    elif q in ["europa league", "uel"]:
+        q = "europa"
+    
+    results = []
+    for m in all_matches:
+        if q in m["home"].lower() or q in m["away"].lower() or q in m["league"].lower():
+            results.append(m)
+            
     return results
 
 # ---------------------------------------------------------
 # PASO B y C: Análisis y Redacción con Gemini API (Estilo Scores24)
 # ---------------------------------------------------------
 def generate_scores24_morning_report(matches: list) -> str:
-    """
-    Genera un informe matutino con saludo de 'Buenos días' y desglose de partidos estilo Scores24.
-    """
     date_str = datetime.now(SPAIN_TZ).strftime("%d/%m/%Y")
     
     if not matches:
-        return f"☀️ <b>Buenos días equipo de @FreeTopTip</b> ({date_str})\n\nHoy no hay encuentros de primera línea registrados en la agenda de partidos. ¡Mantente atento a las actualizaciones del canal!"
+        return f"☀️ <b>Buenos días equipo de @FreeTopTip</b> ({date_str})\n\nNo se registran encuentros de primera línea en este momento. ¡Atentos a las próximas publicaciones!"
 
-    # Formatear el contexto de los partidos
-    context_text = f"Fecha de hoy: {date_str}\nLista de partidos reales confirmados de la jornada:\n"
-    for m in matches[:6]:  # Limitamos a los partidos más relevantes
+    context_text = f"Fecha: {date_str}\nLista de partidos reales confirmados:\n"
+    for m in matches[:6]:
         context_text += f"- Liga: {m['league']} | Partido: {m['match']} | Hora: {m['time']}\n"
 
     prompt = f"""
-    Actúa como un analista profesional de fútbol estilo Scores24 y redactor jefe del canal de Telegram @FreeTopTip.
-    Usa estrictamente la información de partidos reales recibida en el contexto. No inventes partidos ni fechas.
+    Actúa como un analista profesional de fútbol estilo Scores24 para el canal de Telegram @FreeTopTip.
+    Usa la lista de partidos reales proporcionada.
 
-    Escribe una publicación completa para el canal con este formato HTML estricto:
+    Escribe un post para el canal con este formato HTML estricto:
 
-    ☀️ <b>BUENOS DÍAS EQUIPO | CARTELERA Y ANÁLISIS DE HOY ({date_str})</b> ☀️
+    ☀️ <b>BUENOS DÍAS EQUIPO | CARTELERA Y ANÁLISIS ({date_str})</b> ☀️
 
-    Escribe un saludo inicial motivador de 2 líneas para la comunidad de @FreeTopTip.
+    [Breve saludo de 2 líneas]
 
-    A continuación, para cada partido proporcionado en el contexto (máximo 4 partidos destacados):
+    A continuación, desglosa los partidos principales:
 
-    🏆 <b>[Nombre de la Liga]</b>
-    ⏰ <b>Hora:</b> [Hora CEST] | ⚔️ <b>[Equipo Local] vs [Equipo Visitante]</b>
-    📊 <b>Promedio de goles:</b> [Estimación analítica razonable ej: 2.6 goles/partido]
-    📈 <b>Estado de forma reciente:</b> [Desglose breve ej: Local L-W-W | Visitante D-W-L]
-    ⚔️ <b>H2H Duelos directos:</b> [Tendencia histórica previa]
-    🎯 <b>Pronóstico Scores24:</b> [Mercado recomendado ej: Ambos Anotan / Victoria Local] | 🎲 <b>Probabilidad:</b> [Porcentaje %]
-    💡 <b>Análisis táctico:</b> [Explicación detallada en 2 frases cortas del porqué de este pronóstico].
+    🏆 <b>[Liga]</b>
+    ⏰ <b>Hora:</b> [Hora] | ⚔️ <b>[Partido]</b>
+    📊 <b>Promedio de goles:</b> [xG estimado]
+    📈 <b>Racha reciente:</b> [Local vs Visitante]
+    🎯 <b>Pronóstico Scores24:</b> [Mercado] | 🎲 <b>Probabilidad:</b> [%]
+    💡 <b>Análisis táctico:</b> [Explicación de 2 líneas].
 
-    Fin del mensaje con una invitación a interactuar y consultar el canal VIP con @Mark122.
+    Contacto VIP con @Mark122.
     """
 
     if ai_client:
@@ -169,37 +144,29 @@ def generate_scores24_morning_report(matches: list) -> str:
         except Exception as e:
             logging.error(f"Error generando reporte con Gemini: {e}")
 
-    # Respaldo si la API de Gemini falla
-    report = f"☀️ <b>BUENOS DÍAS EQUIPO | CARTELERA DE HOY ({date_str})</b> ☀️\n\n"
+    report = f"☀️ <b>BUENOS DÍAS EQUIPO ({date_str})</b> ☀️\n\n"
     for m in matches[:4]:
-        report += (
-            f"🏆 <b>{m['league']}</b>\n"
-            f"⏰ <b>Hora:</b> {m['time']} | ⚔️ <b>{m['match']}</b>\n"
-            f"📊 <b>Promedio de goles:</b> 2.5\n"
-            f"🎯 <b>Pronóstico Scores24:</b> H.A. +0.5 / Ambos Anotan | 🎲 <b>Probabilidad:</b> 65%\n"
-            f"💡 <b>Análisis táctico:</b> Duelo de alta intensidad con métricas ofensivas destacadas.\n\n"
-        )
-    report += "📲 Contacta para VIP: @Mark122"
+        report += f"🏆 <b>{m['league']}</b>\n⏰ <b>Hora:</b> {m['time']} | ⚔️ <b>{m['match']}</b>\n🎯 <b>Pronóstico:</b> Ambos Anotan | 🎲 <b>Probabilidad:</b> 65%\n\n"
+    report += "📲 VIP: @Mark122"
     return report
 
 def generate_single_match_analysis(match_info: dict) -> str:
-    """Genera un desglose individual de un partido solicitado por el usuario."""
     prompt = f"""
     Actúa como un analista profesional de fútbol estilo Scores24 para @FreeTopTip.
-    Analiza detalladamente este partido real:
+    Analiza este partido real:
     Liga: {match_info['league']}
     Partido: {match_info['match']}
     Hora: {match_info['time']}
 
-    Genera una respuesta en formato HTML estricto:
+    Genera una respuesta en HTML estricto para Telegram:
     🏆 <b>{match_info['league']}</b>
     ⏰ <b>Hora:</b> {match_info['time']} | ⚔️ <b>{match_info['match']}</b>
 
     📊 <b>Promedio de goles estimado:</b> [Dato]
     📈 <b>Racha reciente:</b> [Local vs Visitante]
-    ⚔️ <b>H2H histórico:</b> [Resumen de enfrentamientos]
+    ⚔️ <b>H2H histórico:</b> [Resumen]
     🎯 <b>Pronóstico Scores24:</b> [Pick de valor] | 🎲 <b>Confianza:</b> [%]
-    💡 <b>Análisis detallado:</b> [2 párrafos explicativos sobre xG, ausencias y estilo táctico en primera persona].
+    💡 <b>Análisis detallado:</b> [2 párrafos breves explicando xG, bajas y propuesta táctica en primera persona].
     """
 
     if ai_client:
@@ -215,44 +182,41 @@ def generate_single_match_analysis(match_info: dict) -> str:
     return (
         f"🏆 <b>{match_info['league']}</b>\n"
         f"⏰ <b>Hora:</b> {match_info['time']} | ⚔️ <b>{match_info['match']}</b>\n\n"
-        f"💡 <b>Análisis Scores24:</b> Encuentro analizado según las métricas recientes de xG y forma deportiva. Mercado de valor detectado en líneas de goles."
+        f"💡 <b>Análisis Scores24:</b> Encuentro analizado según métricas de xG. Mercado de valor detectado en líneas de goles."
     )
 
 # ---------------------------------------------------------
-# PASO 3: Comandos e Interacción en Telegram
+# PASO C: Comandos e Interacción en Telegram
 # ---------------------------------------------------------
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /start"""
     msg = (
-        "👋 <b>¡Bienvenido al Bot Oficial de @FreeTopTip (Estilo Scores24)!</b>\n\n"
+        "👋 <b>¡Bienvenido al Bot de @FreeTopTip (Estilo Scores24)!</b>\n\n"
         "Comandos disponibles:\n"
-        "• /buenosdias - Envía el saludo e informe matutino con partidos reales de hoy.\n"
-        "• /buscar [nombre del equipo o liga] - Busca y analiza cualquier partido de hoy en tiempo real."
+        "• /buenosdias - Envía el informe matutino con la cartelera real de hoy.\n"
+        "• /buscar [equipo o liga] - Ejemplo: <code>/buscar mls</code> o <code>/buscar Inter</code>"
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
 async def morning_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /buenosdias"""
-    await update.message.reply_text("🔄 Consultando las API de fútbol y procesando análisis con Gemini...")
-    matches = get_today_matches_realtime()
+    await update.message.reply_text("🔄 Consultando eventos globales y generando informe con Gemini...")
+    matches = fetch_global_matches_rapidapi()
     report = generate_scores24_morning_report(matches)
     await update.message.reply_text(report, parse_mode="HTML", disable_web_page_preview=True)
 
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /buscar <equipo/liga>"""
     if not context.args:
-        await update.message.reply_text("⚠️ Indica el equipo o liga a buscar. Ejemplo: <code>/buscar Real Madrid</code>", parse_mode="HTML")
+        await update.message.reply_text("⚠️ Indica el equipo o liga a buscar. Ejemplo: <code>/buscar mls</code>", parse_mode="HTML")
         return
 
     query = " ".join(context.args)
-    await update.message.reply_text(f"🔍 Buscando partidos de hoy para <b>{query}</b>...", parse_mode="HTML")
+    await update.message.reply_text(f"🔍 Buscando partidos en tiempo real para <b>{query}</b>...", parse_mode="HTML")
 
     results = search_match_by_query(query)
     if not results:
-        await update.message.reply_text(f"❌ No se encontraron partidos reales de hoy para '<b>{query}</b>'. Verifique el nombre o intente de nuevo.", parse_mode="HTML")
+        await update.message.reply_text(f"❌ No se encontraron partidos programados para '<b>{query}</b>' en las próximas horas. Prueba buscando por el nombre de un equipo.", parse_mode="HTML")
         return
 
-    for match in results[:2]:  # Enviamos los partidos encontrados
+    for match in results[:3]:  # Muestra hasta 3 resultados encontrados
         analysis = generate_single_match_analysis(match)
         await update.message.reply_text(analysis, parse_mode="HTML", disable_web_page_preview=True)
 
