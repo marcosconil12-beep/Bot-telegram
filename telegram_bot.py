@@ -31,10 +31,17 @@ SPAIN_TZ = ZoneInfo("Europe/Madrid")
 ai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 # ---------------------------------------------------------
+# Manejador Global de Errores de Red / Telegram
+# ---------------------------------------------------------
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja fallos de red o excepciones para evitar cierres del bot."""
+    logging.warning(f"Excepción de red/ejecución capturada: {context.error}")
+
+# ---------------------------------------------------------
 # PASO A: Consulta Global de Partidos (Cualquier liga del mundo)
 # ---------------------------------------------------------
 def fetch_global_matches_rapidapi() -> list:
-    """Consulta FlashLive/RapidAPI cubriendo TODAS las ligas del mundo (MLS, Europa League, etc.)"""
+    """Consulta FlashLive/RapidAPI cubriendo TODAS las ligas del mundo."""
     matches = []
     if not RAPIDAPI_KEY:
         return matches
@@ -45,7 +52,7 @@ def fetch_global_matches_rapidapi() -> list:
         "X-RapidAPI-Host": "flashlive-sports.p.rapidapi.com"
     }
     
-    # Consultamos día de hoy (0) y próximo día (1) para capturar la madrugada/MLS
+    # Consulta día de hoy (0) y próximo día (1) para abarcar madrugadas/MLS
     for day in ["0", "1"]:
         try:
             params = {"sport_id": "1", "indent_days": day, "locale": "es_ES"}
@@ -82,7 +89,7 @@ def fetch_global_matches_rapidapi() -> list:
     return matches
 
 def search_match_by_query(query: str) -> list:
-    """Filtra y busca partidos de cualquier liga mundial por texto de búsqueda"""
+    """Filtra y busca partidos de cualquier liga mundial por texto de búsqueda."""
     all_matches = fetch_global_matches_rapidapi()
     q = query.lower().strip()
     
@@ -208,30 +215,4 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Indica el equipo o liga a buscar. Ejemplo: <code>/buscar mls</code>", parse_mode="HTML")
         return
 
-    query = " ".join(context.args)
-    await update.message.reply_text(f"🔍 Buscando partidos en tiempo real para <b>{query}</b>...", parse_mode="HTML")
-
-    results = search_match_by_query(query)
-    if not results:
-        await update.message.reply_text(f"❌ No se encontraron partidos programados para '<b>{query}</b>' en las próximas horas. Prueba buscando por el nombre de un equipo.", parse_mode="HTML")
-        return
-
-    for match in results[:3]:  # Muestra hasta 3 resultados encontrados
-        analysis = generate_single_match_analysis(match)
-        await update.message.reply_text(analysis, parse_mode="HTML", disable_web_page_preview=True)
-
-# ---------------------------------------------------------
-# Ejecución Principal
-# ---------------------------------------------------------
-def main():
-    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("buenosdias", morning_report_command))
-    application.add_handler(CommandHandler("buscar", search_command))
-
-    logging.info("Bot en ejecución...")
-    application.run_polling()
-
-if __name__ == "__main__":
-    main()
+    query = " ".join(context.args
