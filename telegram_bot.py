@@ -215,4 +215,34 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Indica el equipo o liga a buscar. Ejemplo: <code>/buscar mls</code>", parse_mode="HTML")
         return
 
-    query = " ".join(context.args
+    query = " ".join(context.args)
+    await update.message.reply_text(f"🔍 Buscando partidos en tiempo real para <b>{query}</b>...", parse_mode="HTML")
+
+    results = search_match_by_query(query)
+    if not results:
+        await update.message.reply_text(f"❌ No se encontraron partidos programados para '<b>{query}</b>' en las próximas horas. Prueba buscando por el nombre de un equipo.", parse_mode="HTML")
+        return
+
+    for match in results[:3]:  # Muestra hasta 3 resultados
+        analysis = generate_single_match_analysis(match)
+        await update.message.reply_text(analysis, parse_mode="HTML", disable_web_page_preview=True)
+
+# ---------------------------------------------------------
+# Ejecución Principal
+# ---------------------------------------------------------
+def main():
+    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+
+    # Registro de manejador de errores de red
+    application.add_error_handler(error_handler)
+
+    # Handlers de comandos
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("buenosdias", morning_report_command))
+    application.add_handler(CommandHandler("buscar", search_command))
+
+    logging.info("Bot en ejecución...")
+    application.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
