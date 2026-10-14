@@ -1,5 +1,5 @@
 requests
 python-telegram-bot
-google-genai
+google-generativeai
 feedparser
 Pillow
