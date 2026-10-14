@@ -33,11 +33,11 @@ else:
     ai_model = None
 
 # ---------------------------------------------------------
-# Generador de Banner Elegante (Sin necesidad de logos/escudos)
+# Generador de Banner Elegante (Sin necesidad de logos)
 # ---------------------------------------------------------
 def create_match_banner(home_team: str, away_team: str, league: str, match_time: str, pick: str) -> BytesIO:
     width, height = 900, 480
-    image = Image.new("RGB", (width, height), color=(11, 19, 43)) # Fondo azul noche VIP
+    image = Image.new("RGB", (width, height), color=(11, 19, 43))
     draw = ImageDraw.Draw(image)
 
     # Marco exterior
@@ -121,7 +121,7 @@ def fetch_realtime_matches() -> list:
     return matches
 
 # ---------------------------------------------------------
-# Análisis Completo e Imparable Estilo Scores24
+# Análisis Completo Estilo Scores24
 # ---------------------------------------------------------
 def generate_advanced_multimarket_analysis(m: dict) -> tuple[str, str]:
     prompt = f"""
@@ -166,7 +166,6 @@ def generate_advanced_multimarket_analysis(m: dict) -> tuple[str, str]:
         except Exception as e:
             logging.error(f"Error en Gemini: {e}")
 
-    # Si por alguna razón la IA fallara temporalmente, enviamos este análisis Scores24 completo de respaldo
     fallback = (
         f"🏆 <b>{m['league']}</b>\n"
         f"⏰ <b>Hora:</b> {m['time']} | ⚔️ <b>{m['home']} vs {m['away']}</b>\n\n"
@@ -220,3 +219,17 @@ async def force_post_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text("✅ Publicación completada con éxito.")
 
 def main():
+    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+
+    job_queue = application.job_queue
+    if job_queue:
+        job_queue.run_repeating(auto_post_job, interval=14400, first=15)
+
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("publicar", force_post_command))
+
+    logging.info("Bot en marcha...")
+    application.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
