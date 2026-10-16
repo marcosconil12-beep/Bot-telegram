@@ -13,7 +13,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # ---------------------------------------------------------
 # Configuración y Entorno
 # ---------------------------------------------------------
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
@@ -176,7 +179,6 @@ async def auto_post_job(context: ContextTypes.DEFAULT_TYPE):
     if not matches:
         return
 
-    # Botón Flotante Directo a tu Telegram Personal
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("💬 UNIRSE AL VIP / CONTACTO DIRECTO", url="https://t.me/Mark122")]
     ])
@@ -195,7 +197,7 @@ async def auto_post_job(context: ContextTypes.DEFAULT_TYPE):
                 photo=banner_img,
                 caption=analysis_html,
                 parse_mode="HTML",
-                reply_markup=keyboard  # Añade el botón directo a tu chat
+                reply_markup=keyboard
             )
             PUBLISHED_MATCHES_TODAY.add(match_id)
             break
@@ -203,15 +205,18 @@ async def auto_post_job(context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Error en auto_post: {e}")
 
 # ---------------------------------------------------------
-# Respuestas por Comandos Directos al Bot
+# Manejo de Errores Globales
 # ---------------------------------------------------------
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logging.error(msg="Excepción gestionada mientras se procesaba una actualización:", exc_info=context.error)
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("💬 HABLAR CON MARK122", url="https://t.me/Mark122")]
     ])
     await update.message.reply_text(
         "👋 <b>¡Hola! Bienvenido al bot oficial de @FreeTopTip.</b>\n\n"
-        "Para unirte a nuestro Canal VIP, solicitar pronósticos exclusivos o consultar dudas, pulsa el botón de abajo para hablar directamente conmigo.",
+        "Para unirte a nuestro Canal VIP o consultar dudas, pulsa el botón de abajo para hablar conmigo directamente.",
         parse_mode="HTML",
         reply_markup=keyboard
     )
@@ -219,15 +224,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
+    # Añadimos el manejador de errores de red
+    application.add_error_handler(error_handler)
+
     job_queue = application.job_queue
     if job_queue:
-        # Revisa cada 30 minutos (1800 segundos) partidos de las próximas 12h
         job_queue.run_repeating(auto_post_job, interval=1800, first=15)
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("vip", start_command))
 
-    logging.info("Bot configurado con redirección directa a @Mark122...")
+    logging.info("Bot configurado con gestor de errores y reconexión activa...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
