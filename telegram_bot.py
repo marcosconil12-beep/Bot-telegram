@@ -18,7 +18,8 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
+# Nuevo Token configurado
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAHdtvCjS5o4_-p2Bk7w6mSDBBA2gbHi470")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -224,7 +225,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Añadimos el manejador de errores de red
     application.add_error_handler(error_handler)
 
     job_queue = application.job_queue
@@ -234,7 +234,7 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("vip", start_command))
 
-    logging.info("Bot configurado con gestor de errores y reconexión activa...")
+    logging.info("Bot configurado con nuevo token y redirección activa...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
