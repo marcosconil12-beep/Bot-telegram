@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from io import BytesIO
 from PIL import Image, ImageDraw
-from google import genai
+import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
@@ -29,18 +29,18 @@ SPAIN_TZ = ZoneInfo("Europe/Madrid")
 PUBLISHED_MATCHES_TODAY = set()
 LAST_CLEAN_DATE = datetime.now(SPAIN_TZ).strftime("%Y-%m-%d")
 
-# Cliente de Gemini Oficial
 if GEMINI_API_KEY:
     try:
-        ai_client = genai.Client(api_key=GEMINI_API_KEY)
+        genai.configure(api_key=GEMINI_API_KEY)
+        ai_model = genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
-        logging.error(f"Error inicializando cliente Gemini: {e}")
-        ai_client = None
+        logging.error(f"Error configurando Gemini: {e}")
+        ai_model = None
 else:
-    ai_client = None
+    ai_model = None
 
 # ---------------------------------------------------------
-# Generador de Banner Elegante
+# Banner Visual Pro
 # ---------------------------------------------------------
 def create_match_banner(home_team: str, away_team: str, league: str, match_time: str, pick: str) -> BytesIO:
     width, height = 900, 480
@@ -69,7 +69,7 @@ def create_match_banner(home_team: str, away_team: str, league: str, match_time:
     return bio
 
 # ---------------------------------------------------------
-# Filtro de Partidos
+# Filtro de Partidos de la Jornada
 # ---------------------------------------------------------
 def fetch_upcoming_12h_matches() -> list:
     matches = []
@@ -140,7 +140,7 @@ def generate_advanced_multimarket_analysis(m: dict) -> tuple[str, str]:
     • 🟨 <b>Tarjetas:</b> Over 3.5
 
     💡 <b>ANÁLISIS TÁCTICO:</b>
-    El equipo local llega en dinámica positiva y monopolizando el ataque por bandas. El visitante suele encajar pronto fuera de casa, concediendo volumen de tiro.
+    El conjunto local llega en dinámica positiva y monopolizando el ataque por bandas. El equipo visitante suele encajar pronto fuera de casa, concediendo volumen de tiro.
 
     🎯 <b>PICK RECOMENDADO:</b> Gana Local / Hándicap 0.0
     🎲 <b>Confianza:</b> 85%
@@ -150,21 +150,18 @@ def generate_advanced_multimarket_analysis(m: dict) -> tuple[str, str]:
 
     pick = f"Hándicap Asiático {m['home']} 0.0"
 
-    if ai_client:
+    if ai_model:
         try:
-            response = ai_client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-            )
-            if response and response.text:
-                text = response.text.strip()
+            res = ai_model.generate_content(prompt)
+            if res and res.text:
+                text = res.text.strip()
                 if "PICK RECOMENDADO" in text:
                     for line in text.split("\n"):
                         if "PICK RECOMENDADO" in line:
                             pick = line.split(":")[-1].replace("<b>", "").replace("</b>", "").strip()
                 return text, pick
         except Exception as e:
-            logging.error(f"Error llamando a Gemini SDK: {e}")
+            logging.error(f"Error Gemini: {e}")
 
     extenso_fallback = (
         f"🏆 <b>{m['league']}</b>\n"
@@ -214,7 +211,7 @@ async def auto_post_job(context: ContextTypes.DEFAULT_TYPE):
             analysis_html, pick_text = generate_advanced_multimarket_analysis(m)
             banner_img = create_match_banner(m['home'], m['away'], m['league'], m['time'], pick_text)
 
-            # Recorte estricto de seguridad para no superar el límite de 1024 caracteres de Telegram para fotos
+            # Recorte estricto de seguridad para no superar el límite de 1024 caracteres
             if len(analysis_html) > 1000:
                 analysis_html = analysis_html[:990] + "...\n\n📩 <b>Contacto VIP:</b> @Mark122"
 
