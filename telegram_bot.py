@@ -2,21 +2,18 @@ import os
 import time
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from io import BytesIO
 from PIL import Image, ImageDraw
 import google.generativeai as genai
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # ---------------------------------------------------------
-# Configuración de Logging y Entorno
+# Configuración y Entorno
 # ---------------------------------------------------------
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAG0wJnyLFfEaBMY8XadJs1dZdSQU42ah7c")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
@@ -25,6 +22,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "d6abc7c413mshf80c5e16b6760bcp14e3f9jsnf2c34103db6c")
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
+PUBLISHED_MATCHES_TODAY = set()
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -33,32 +31,26 @@ else:
     ai_model = None
 
 # ---------------------------------------------------------
-# Generador de Banner Elegante (Sin necesidad de logos)
+# Banner Visual Pro
 # ---------------------------------------------------------
 def create_match_banner(home_team: str, away_team: str, league: str, match_time: str, pick: str) -> BytesIO:
     width, height = 900, 480
     image = Image.new("RGB", (width, height), color=(11, 19, 43))
     draw = ImageDraw.Draw(image)
 
-    # Marco exterior
     draw.rectangle([10, 10, width - 10, height - 10], outline=(37, 99, 235), width=3)
-
-    # Banner Superior de Liga
     draw.rectangle([30, 25, width - 30, 85], fill=(30, 41, 59))
     draw.text((45, 38), f"🏆 {league[:55].upper()}", fill=(255, 255, 255))
-    draw.text((45, 62), f"⏰ HORA: {match_time} | 🟢 ANÁLISIS SCORES24", fill=(52, 211, 153))
+    draw.text((45, 62), f"⏰ HORA: {match_time} | 🟢 ANÁLISIS SCORES24 EN VIVO", fill=(52, 211, 153))
 
-    # Texto Enfrentamiento
-    draw.text((50, 130), "ENFRENTAMIENTO DIRECTO", fill=(148, 163, 184))
+    draw.text((50, 130), "PRÓXIMO ENCUENTRO (PRÓXIMAS 12 HORAS)", fill=(148, 163, 184))
     match_str = f"⚔️  {home_team.upper()}\n       VS\n    {away_team.upper()}"
     draw.text((50, 165), match_str, fill=(248, 250, 252))
 
-    # Recuadro Pronóstico Principal
     draw.rectangle([30, 330, width - 30, 435], fill=(15, 23, 42), outline=(16, 185, 129), width=3)
-    draw.text((50, 345), "🎯 RECOMENDACIÓN SCORES24 / APUESTA DE VALOR", fill=(16, 185, 129))
+    draw.text((50, 345), "🎯 RECOMENDACIÓN / HÁNDICAP / MERCADO DE VALOR", fill=(16, 185, 129))
     draw.text((50, 380), f"🔥 {pick}", fill=(255, 255, 255))
 
-    # Firma inferior
     draw.text((width - 240, height - 25), "Canal Oficial: @FreeTopTip", fill=(100, 116, 139))
 
     bio = BytesIO()
@@ -68,26 +60,17 @@ def create_match_banner(home_team: str, away_team: str, league: str, match_time:
     return bio
 
 # ---------------------------------------------------------
-# Filtro de Ligas Profesionales Top
+# Filtro de Partidos de las Próximas 12 Horas
 # ---------------------------------------------------------
-def is_valid_professional_league(league_name: str) -> bool:
-    name = league_name.upper()
-    forbidden = ["SUB-", "SUB ", "U15", "U17", "U19", "U20", "U21", "U23", "JUVENIL", "AMATEUR", "REGIONAL", "WOMEN", "FEMENINO", "ACADEMY"]
-    for term in forbidden:
-        if term in name:
-            return False
-    return True
-
-def fetch_realtime_matches() -> list:
+def fetch_upcoming_12h_matches() -> list:
     matches = []
     if not RAPIDAPI_KEY:
         return matches
 
     url = "https://flashlive-sports.p.rapidapi.com/v1/events/list"
-    headers = {
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": "flashlive-sports.p.rapidapi.com"
-    }
+    headers = {"X-RapidAPI-Key": RAPIDAPI_KEY, "X-RapidAPI-Host": "flashlive-sports.p.rapidapi.com"}
+    now = datetime.now(SPAIN_TZ)
+    limit_time = now + timedelta(hours=12)
 
     try:
         params = {"sport_id": "1", "indent_days": "0", "locale": "es_ES", "timezone": "2"}
@@ -99,103 +82,110 @@ def fetch_realtime_matches() -> list:
                 country = tournament.get("COUNTRY_NAME", "Global").upper()
                 full_league = f"{country} - {league}"
 
-                if not is_valid_professional_league(full_league):
-                    continue
-
                 for ev in tournament.get("EVENTS", []):
-                    home = ev.get("HOME_NAME", "")
-                    away = ev.get("AWAY_NAME", "")
                     start_ts = ev.get("START_TIME", 0)
-                    m_time = datetime.fromtimestamp(start_ts, SPAIN_TZ).strftime("%H:%M") + " CEST" if start_ts else "Por definir"
-
-                    if home and away:
-                        matches.append({
-                            "league": full_league,
-                            "home": home,
-                            "away": away,
-                            "time": m_time
-                        })
+                    if not start_ts:
+                        continue
+                    
+                    match_dt = datetime.fromtimestamp(start_ts, SPAIN_TZ)
+                    if now <= match_dt <= limit_time:
+                        home = ev.get("HOME_NAME", "")
+                        away = ev.get("AWAY_NAME", "")
+                        if home and away:
+                            matches.append({
+                                "league": full_league,
+                                "home": home,
+                                "away": away,
+                                "time": match_dt.strftime("%H:%M") + " CEST",
+                                "id": f"{home}_vs_{away}_{match_dt.strftime('%H%M')}"
+                            })
     except Exception as e:
-        logging.error(f"Error extrayendo partidos: {e}")
+        logging.error(f"Error consultando calendario de 12h: {e}")
 
     return matches
 
 # ---------------------------------------------------------
-# Análisis Completo Estilo Scores24
+# Análisis Multimercado Scores24 con Gemini
 # ---------------------------------------------------------
 def generate_advanced_multimarket_analysis(m: dict) -> tuple[str, str]:
     prompt = f"""
-    Actúa como un tipster y analista profesional de fútbol estilo Scores24 para el canal @FreeTopTip.
-    Analiza este partido profesional de forma extensa y detallada:
+    Actúa como analista jefe de apuestas deportivas estilo Scores24 para @FreeTopTip.
+    Analiza este partido real que se juega en las próximas horas:
 
     Liga: {m['league']}
     Partido: {m['home']} vs {m['away']}
     Hora: {m['time']}
 
-    Redacta obligatoriamente un post completo en HTML para Telegram con esta estructura exacta:
+    Escribe un post completo en HTML para Telegram que incluya:
+    1. Quién ganará o recomendación de Hándicap Asiático.
+    2. Estado de forma reciente de ambos equipos.
+    3. Total de goles previsto (Over/Under xG).
+    4. Proyección de total de córners y tarjetas esperadas.
 
+    Estructura HTML:
     🏆 <b>{m['league']}</b>
     ⏰ <b>Hora:</b> {m['time']} | ⚔️ <b>{m['home']} vs {m['away']}</b>
 
-    📊 <b>MÉTRICAS SCORES24 Y ESTADÍSTICAS:</b>
-    • ⚽ <b>xG (Goles Esperados):</b> Proyección analítica basada en últimos 5 partidos.
-    • 🚩 <b>Córners proyectados:</b> Promedio estimado por banda.
-    • 🟨 <b>Línea de Tarjetas:</b> Intensidad del árbitro y faltas cometidas.
-    • 🎯 <b>Remates a puerta:</b> Estimación de tiros globales.
+    📊 <b>MÉTRICAS SCORES24 EN TIEMPO REAL:</b>
+    • ⚽ <b>Goles previstos (xG):</b> [Dato analítico]
+    • 🚩 <b>Córners estimados:</b> [Dato]
+    • 🟨 <b>Tarjetas totales:</b> [Dato]
+    • 📈 <b>Estado de forma:</b> [Resumen breve]
 
-    💡 <b>ANÁLISIS TÁCTICO PROFUNDO:</b>
-    Escribe 2 párrafos detallados redactados en primera persona analizando el momento de forma de ambos conjuntos, planteamiento de los entrenadores y dinámicas ofensivas.
+    💡 <b>ANÁLISIS TÁCTICO DETALLADO:</b>
+    [2 párrafos redactados en primera persona analizando el porqué apostamos por este pick].
 
-    🎯 <b>PRONÓSTICO VIP:</b> [Selecciona un mercado claro: ej. Gana Local sin empate / Over 2.5 Goles / Over 8.5 Córners / Hándicap Asiático]
+    🎯 <b>PICK RECOMENDADO:</b> [Mercado exacto sugerido]
     🎲 <b>Índice de Confianza:</b> 85%
 
-    📲 Contacto VIP: @Mark122
+    📩 <b>Para solicitar el STAKE MÁXIMO o acceso al CANAL VIP, pulsa el botón de abajo para hablar conmigo.</b>
     """
 
-    pick = "Gana Local / Apuesta Sin Empate"
+    pick = "Gana Local / Hándicap Asiático 0.0"
     if ai_model:
         try:
             res = ai_model.generate_content(prompt)
             if res and res.text:
                 text = res.text.strip()
-                if "PRONÓSTICO VIP" in text:
+                if "PICK RECOMENDADO" in text:
                     for line in text.split("\n"):
-                        if "PRONÓSTICO VIP" in line:
+                        if "PICK RECOMENDADO" in line:
                             pick = line.split(":")[-1].replace("<b>", "").replace("</b>", "").strip()
                 return text, pick
         except Exception as e:
-            logging.error(f"Error en Gemini: {e}")
+            logging.error(f"Error Gemini: {e}")
 
     fallback = (
         f"🏆 <b>{m['league']}</b>\n"
         f"⏰ <b>Hora:</b> {m['time']} | ⚔️ <b>{m['home']} vs {m['away']}</b>\n\n"
-        f"📊 <b>MÉTRICAS SCORES24 Y ESTADÍSTICAS:</b>\n"
-        f"• ⚽ <b>xG (Goles Esperados):</b> 1.75 vs 1.20\n"
-        f"• 🚩 <b>Córners proyectados:</b> Over 8.5 Córners\n"
-        f"• 🟨 <b>Línea de Tarjetas:</b> Over 3.5 Tarjetas\n"
-        f"• 🎯 <b>Remates a puerta:</b> 8.5 globales\n\n"
-        f"💡 <b>ANÁLISIS TÁCTICO PROFUNDO:</b>\n"
-        f"El conjunto local llega tras mostrar un rendimiento sólido en sus últimas presentaciones, destacando por su volumen ofensivo y presión en campo contrario. Por su parte, el equipo visitante suele presentar dificultades cuando encaja el primer gol, lo que puede condicionar su planteamiento táctico.\n\n"
-        f"Esperamos un partido abierto con claras oportunidades en ambas áreas donde la mayor efectividad de los locales marcará la diferencia.\n\n"
-        f"🎯 <b>PRONÓSTICO VIP:</b> {pick}\n"
-        f"🎲 <b>Índice de Confianza:</b> 85%\n\n"
-        f"📲 Contacto VIP: @Mark122"
+        f"📊 <b>MÉTRICAS SCORES24:</b>\n"
+        f"• ⚽ <b>Goles previstos:</b> Over 2.5\n"
+        f"• 🚩 <b>Córners:</b> Over 8.5\n\n"
+        f"🎯 <b>PICK RECOMENDADO:</b> {pick}\n"
+        f"📩 <b>Habla conmigo para acceder al VIP:</b> @Mark122"
     )
     return fallback, pick
 
 # ---------------------------------------------------------
-# Tarea de Publicación Automática
+# Tarea Programada de Publicación
 # ---------------------------------------------------------
 async def auto_post_job(context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
-    logging.info("Buscando partidos profesionales para publicar...")
-    matches = fetch_realtime_matches()
+    matches = fetch_upcoming_12h_matches()
 
     if not matches:
-        logging.info("No hay partidos profesionales disponibles en este momento.")
         return
 
-    for m in matches[:2]:
+    # Botón Flotante Directo a tu Telegram Personal
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💬 UNIRSE AL VIP / CONTACTO DIRECTO", url="https://t.me/Mark122")]
+    ])
+
+    for m in matches:
+        match_id = m["id"]
+        if match_id in PUBLISHED_MATCHES_TODAY:
+            continue
+
         try:
             analysis_html, pick_text = generate_advanced_multimarket_analysis(m)
             banner_img = create_match_banner(m['home'], m['away'], m['league'], m['time'], pick_text)
@@ -204,31 +194,40 @@ async def auto_post_job(context: ContextTypes.DEFAULT_TYPE):
                 chat_id=TELEGRAM_CHAT_ID,
                 photo=banner_img,
                 caption=analysis_html,
-                parse_mode="HTML"
+                parse_mode="HTML",
+                reply_markup=keyboard  # Añade el botón directo a tu chat
             )
-            time.sleep(6)
+            PUBLISHED_MATCHES_TODAY.add(match_id)
+            break
         except Exception as e:
-            logging.error(f"Error publicando en canal: {e}")
+            logging.error(f"Error en auto_post: {e}")
 
+# ---------------------------------------------------------
+# Respuestas por Comandos Directos al Bot
+# ---------------------------------------------------------
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Bot activo en Modo Piloto Automático con análisis estilo Scores24.", parse_mode="HTML")
-
-async def force_post_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔄 Generando análisis Scores24 y publicando en el canal...")
-    await auto_post_job(context)
-    await update.message.reply_text("✅ Publicación completada con éxito.")
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💬 HABLAR CON MARK122", url="https://t.me/Mark122")]
+    ])
+    await update.message.reply_text(
+        "👋 <b>¡Hola! Bienvenido al bot oficial de @FreeTopTip.</b>\n\n"
+        "Para unirte a nuestro Canal VIP, solicitar pronósticos exclusivos o consultar dudas, pulsa el botón de abajo para hablar directamente conmigo.",
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
 
 def main():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     job_queue = application.job_queue
     if job_queue:
-        job_queue.run_repeating(auto_post_job, interval=14400, first=15)
+        # Revisa cada 30 minutos (1800 segundos) partidos de las próximas 12h
+        job_queue.run_repeating(auto_post_job, interval=1800, first=15)
 
     application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("publicar", force_post_command))
+    application.add_handler(CommandHandler("vip", start_command))
 
-    logging.info("Bot en marcha...")
+    logging.info("Bot configurado con redirección directa a @Mark122...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
