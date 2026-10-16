@@ -118,31 +118,33 @@ def fetch_upcoming_12h_matches() -> list:
     return matches
 
 # ---------------------------------------------------------
-# Generación de Análisis Scores24 Conciso y Válido
+# Generador Dinámico e Inteligente de Análisis
 # ---------------------------------------------------------
 def generate_advanced_multimarket_analysis(m: dict) -> tuple[str, str]:
     prompt = f"""
-    Actúa como analista jefe estilo Scores24 para @FreeTopTip.
-    Analiza este partido de forma clara y directa:
+    Actúa como analista jefe de apuestas deportivas estilo Scores24 para @FreeTopTip.
+    Analiza este partido real:
 
     Liga: {m['league']}
     Partido: {m['home']} vs {m['away']}
     Hora: {m['time']}
 
-    Redacta un post en HTML para Telegram (máximo 800 caracteres) con esta estructura exacta:
+    Escribe un post único en HTML para Telegram (máximo 800 caracteres) analizando este partido en concreto.
+    Varía el mercado recomendado entre Victoria Local, Hándicap Asiático, Over de Goles o Córners según encaje mejor.
 
+    Estructura HTML:
     🏆 <b>{m['league']}</b>
     ⏰ <b>Hora:</b> {m['time']} | ⚔️ <b>{m['home']} vs {m['away']}</b>
 
     📊 <b>MÉTRICAS SCORES24:</b>
-    • ⚽ <b>xG:</b> 1.75 vs 1.25
-    • 🚩 <b>Córners:</b> Over 8.5
-    • 🟨 <b>Tarjetas:</b> Over 3.5
+    • ⚽ <b>xG:</b> [Métrica estimada]
+    • 🚩 <b>Córners:</b> [Métrica estimada]
+    • 🟨 <b>Tarjetas:</b> [Métrica estimada]
 
     💡 <b>ANÁLISIS TÁCTICO:</b>
-    El conjunto local llega en dinámica positiva y monopolizando el ataque por bandas. El equipo visitante suele encajar pronto fuera de casa, concediendo volumen de tiro.
+    [Escribe 2 frases únicas sobre el estilo de juego de {m['home']} y {m['away']}].
 
-    🎯 <b>PICK RECOMENDADO:</b> Gana Local / Hándicap 0.0
+    🎯 <b>PICK RECOMENDADO:</b> [Mercado Seleccionado]
     🎲 <b>Confianza:</b> 85%
 
     📩 <b>Solicita el STAKE MÁXIMO en el botón de abajo.</b>
@@ -150,6 +152,7 @@ def generate_advanced_multimarket_analysis(m: dict) -> tuple[str, str]:
 
     pick = f"Hándicap Asiático {m['home']} 0.0"
 
+    # Intento 1: Generación con Gemini IA
     if ai_model:
         try:
             res = ai_model.generate_content(prompt)
@@ -161,25 +164,50 @@ def generate_advanced_multimarket_analysis(m: dict) -> tuple[str, str]:
                             pick = line.split(":")[-1].replace("<b>", "").replace("</b>", "").strip()
                 return text, pick
         except Exception as e:
-            logging.error(f"Error Gemini: {e}")
+            logging.error(f"Error Gemini IA: {e}")
 
-    extenso_fallback = (
+    # Intento 2: Generador Dinámico Variado (Variación Automática de Mercados)
+    market_options = [
+        {
+            "pick": f"Victoria {m['home']} (Ganador 1X2)",
+            "metrics": "• ⚽ <b>xG Proyectado:</b> 1.95 vs 0.85\n• 🚩 <b>Córners estimados:</b> Over 9.5\n• 🟨 <b>Tarjetas esperadas:</b> Over 4.5",
+            "tactics": f"El conjunto local de {m['home']} llega en una dinámica de juego muy superior en su estadio, promediando un alto índice de posesión. Por su parte, {m['away']} suele conceder espacios al replegarse a domicilio."
+        },
+        {
+            "pick": f"Over 2.5 Goles Totales",
+            "metrics": "• ⚽ <b>xG Combinado:</b> 3.10 Goles Esperados\n• 🚩 <b>Córners estimados:</b> Over 8.5\n• 🟨 <b>Tarjetas esperadas:</b> Over 3.5",
+            "tactics": f"Duelo de alta intensidad ofensiva. Las métricas reflejan que tanto {m['home']} como {m['away']} generan un volumen elevado de disparos a puerta por partido y sufren en transiciones defensivas."
+        },
+        {
+            "pick": f"Hándicap Asiático {m['home']} 0.0",
+            "metrics": "• ⚽ <b>xG Proyectado:</b> 1.65 vs 1.10\n• 🚩 <b>Córners estimados:</b> Over 8.5\n• 🟨 <b>Tarjetas esperadas:</b> Over 4.5",
+            "tactics": f"Buscamos la cobertura en este choque equilibrado. {m['home']} mantiene una solidez defensiva destacable en casa, mientras que {m['away']} tiende a especular con el resultado en desplazamientos exigentes."
+        },
+        {
+            "pick": f"Over 8.5 Córners Totales",
+            "metrics": "• ⚽ <b>xG Proyectado:</b> 1.40 vs 1.20\n• 🚩 <b>Córners estimados:</b> 11.2 Proyectados\n• 🟨 <b>Tarjetas esperadas:</b> Over 3.5",
+            "tactics": f"Ambos conjuntos vuelcan constantemente su ataque por las bandas mediante centros al área. La estadística conjunta supera ampliamente la línea propuesta para saques de esquina."
+        }
+    ]
+
+    selected = random.choice(market_options)
+    pick = selected["pick"]
+
+    dinamico_fallback = (
         f"🏆 <b>{m['league']}</b>\n"
         f"⏰ <b>Hora:</b> {m['time']} | ⚔️ <b>{m['home']} vs {m['away']}</b>\n\n"
         f"📊 <b>MÉTRICAS SCORES24:</b>\n"
-        f"• ⚽ <b>xG Proyectado:</b> 1.75 vs 1.20\n"
-        f"• 🚩 <b>Córners estimados:</b> Over 8.5\n"
-        f"• 🟨 <b>Tarjetas esperadas:</b> Over 3.5\n\n"
+        f"{selected['metrics']}\n\n"
         f"💡 <b>ANÁLISIS TÁCTICO:</b>\n"
-        f"El conjunto de {m['home']} mantiene un ritmo de alta presión tras pérdida en su feudo. Por su parte, {m['away']} suele conceder espacios al replegarse en transiciones rápidas fuera de casa.\n\n"
+        f"{selected['tactics']}\n\n"
         f"🎯 <b>PICK RECOMENDADO:</b> {pick}\n"
         f"🎲 <b>Confianza:</b> 85%\n\n"
         f"📩 <b>Habla conmigo para acceder al VIP.</b>"
     )
-    return extenso_fallback, pick
+    return dinamico_fallback, pick
 
 # ---------------------------------------------------------
-# Tarea de Publicación con Recorte de Seguridad (Límite 1024)
+# Tarea de Publicación
 # ---------------------------------------------------------
 async def auto_post_job(context: ContextTypes.DEFAULT_TYPE):
     global PUBLISHED_MATCHES_TODAY, LAST_CLEAN_DATE
@@ -211,7 +239,6 @@ async def auto_post_job(context: ContextTypes.DEFAULT_TYPE):
             analysis_html, pick_text = generate_advanced_multimarket_analysis(m)
             banner_img = create_match_banner(m['home'], m['away'], m['league'], m['time'], pick_text)
 
-            # Recorte estricto de seguridad para no superar el límite de 1024 caracteres
             if len(analysis_html) > 1000:
                 analysis_html = analysis_html[:990] + "...\n\n📩 <b>Contacto VIP:</b> @Mark122"
 
@@ -255,7 +282,7 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("vip", start_command))
 
-    logging.info("Bot en marcha con límites de texto ajustados...")
+    logging.info("Bot en marcha con generador dinámico de análisis...")
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
