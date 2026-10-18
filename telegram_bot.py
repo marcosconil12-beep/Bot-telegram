@@ -110,8 +110,7 @@ async def start_command(update: object, context: ContextTypes.DEFAULT_TYPE):
     ])
     if hasattr(update, 'message') and update.message:
         await update.message.reply_text(
-            "👋 <b>¡Hola! Bienvenido al bot oficial de @FreeTopTip.</b>\n\n"
-            "Para unirte a nuestro Canal VIP o consultar dudas, pulsa el botón de abajo para hablar conmigo directamente.",
+            "👋 <b>¡Hola! Bienvenido al bot oficial de @FreeTopTip.</b>",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -123,4 +122,11 @@ def main():
     if job_queue:
         job_queue.run_once(publish_picks, when=5)
 
-    application.add_handler(CommandHandler
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("vip", start_command))
+
+    logging.info("Bot en marcha sin errores...")
+    application.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
