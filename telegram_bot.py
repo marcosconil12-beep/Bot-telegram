@@ -16,133 +16,52 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # ---------------------------------------------------------
-# Pronósticos con Códigos de Seguimiento
+# Resumen Oficial con Códigos y Resultados Reales
 # ---------------------------------------------------------
-MATCH_PICKS = [
-    {
-        "code": "TUR-TRAB-BESIK",
-        "text": (
-            "🇹🇷 <b>TURQUÍA - SUPER LIG</b>\n"
-            "⏰ <b>Hora:</b> 19:00 CEST | ⚔️ <b>Trabzonspor vs Beşiktaş</b>\n\n"
-            "📊 <b>CÓDIGO DE SEGUIMIENTO:</b> <code>TUR-TRAB-BESIK</code>\n\n"
-            "• ⚽ <b>xG Proyectado:</b> 1.45 vs 1.50 | Over 2.5 Goles\n"
-            "• 🏆 <b>Pick Resultado:</b> Ambos Equipos Anotan (BTTS) [Cuota 1.66]\n"
-            "• 🚩 <b>Córners totales:</b> Over 9.5 Córners Totales\n"
-            "• 🟨 <b>Tarjetas totales:</b> Over 5.5 Tarjetas Totales\n"
-            "• 🎯 <b>Remates a puerta:</b> Trabzonspor (4.5) vs Beşiktaş (4.8)\n"
-            "• 🧤 <b>Paradas Porteros:</b> Over 3.5 Paradas cada uno\n\n"
-            "💡 <b>ANÁLISIS TÁCTICO DE PREVIA:</b>\n"
-            "Partidazo en Papara Park entre dos gigantes turcos que no especulan. Trabzonspor se fortalece como local proponiendo ataques verticales directos, mientras que el Beşiktaş llega con un bloque ofensivo muy dinámico en transición. Ambas defensas suelen conceder ocasiones claras en balones divididos."
-        )
-    },
-    {
-        "code": "ITA-MON-CAG",
-        "text": (
-            "🇮🇹 <b>ITALIA - SERIE A</b>\n"
-            "⏰ <b>Hora:</b> 18:30 CEST | ⚔️ <b>Monza vs Cagliari</b>\n\n"
-            "📊 <b>CÓDIGO DE SEGUIMIENTO:</b> <code>ITA-MON-CAG</code>\n\n"
-            "• ⚽ <b>xG Proyectado:</b> 1.30 vs 1.05 | Under 2.5 Goles\n"
-            "• 🏆 <b>Pick Resultado:</b> Monza HA 0.0 (Apuesta Sin Empate) [Cuota 1.62]\n"
-            "• 🚩 <b>Córners totales:</b> Under 9.5 Córners Totales\n"
-            "• 🟨 <b>Tarjetas totales:</b> Over 4.5 Tarjetas Totales\n"
-            "• 🎯 <b>Remates a puerta:</b> Monza (4.1) vs Cagliari (3.2)\n"
-            "• 🧤 <b>Paradas Portero Cagliari:</b> Over 3.5 Paradas\n\n"
-            "💡 <b>ANÁLISIS TÁCTICO DE PREVIA:</b>\n"
-            "Monza busca hacerse fuerte ante un Cagliari que sufre bastante para sostener la posesión en desplazamientos lejanos. Los locales dominan el ritmo en la medular y conceden muy poco en juego aéreo. La opción del hándicap asiático nulo nos protege plenamente en caso de igualdad."
-        )
-    },
-    {
-        "code": "ITA-PAR-TOR",
-        "text": (
-            "🇮🇹 <b>ITALIA - SERIE A</b>\n"
-            "⏰ <b>Hora:</b> 20:45 CEST | ⚔️ <b>Parma vs Torino</b>\n\n"
-            "📊 <b>CÓDIGO DE SEGUIMIENTO:</b> <code>ITA-PAR-TOR</code>\n\n"
-            "• ⚽ <b>xG Proyectado:</b> 1.20 vs 1.40 | Over 2.0 Goles Totales\n"
-            "• 🏆 <b>Pick Resultado:</b> Torino HA 0.0 (Apuesta Sin Empate) [Cuota 1.70 / Directo 2.40]\n"
-            "• 🚩 <b>Córners totales:</b> Over 8.5 Córners Totales\n"
-            "• 🟨 <b>Tarjetas totales:</b> Over 4.5 Tarjetas Totales\n"
-            "• 🎯 <b>Remates a puerta:</b> Parma (3.6) vs Torino (4.5)\n"
-            "• 🧤 <b>Paradas Portero Parma:</b> Over 3.5 Paradas\n\n"
-            "💡 <b>ANÁLISIS TÁCTICO DE PREVIA:</b>\n"
-            "Torino se muestra como un conjunto tácticamente muy bien estructurado sin balón, capaz de asfixiar las bandas del Parma. El conjunto local tiende a dejar desajustes defensivos cuando adelanta sus líneas, algo que el Torino sabrá explotar con sus atacantes."
-        )
-    },
-    {
-        "code": "POR-BRA-GIL",
-        "text": (
-            "🇵🇹 <b>PORTUGAL - PRIMEIRA LIGA</b>\n"
-            "⏰ <b>Hora:</b> 21:15 CEST | ⚔️ <b>Braga vs Gil Vicente</b>\n\n"
-            "📊 <b>CÓDIGO DE SEGUIMIENTO:</b> <code>POR-BRA-GIL</code>\n\n"
-            "• ⚽ <b>xG Proyectado:</b> 2.10 vs 0.75 | Over 2.5 Goles\n"
-            "• 🏆 <b>Pick Resultado:</b> Victoria Braga Directa [Cuota 1.53]\n"
-            "• 🚩 <b>Córners totales:</b> Over 9.5 Córners Totales\n"
-            "• 🟨 <b>Tarjetas totales:</b> Over 4.0 Tarjetas Totales\n"
-            "• 🎯 <b>Remates a puerta:</b> Braga (6.4) vs Gil Vicente (2.8)\n"
-            "• 🧤 <b>Paradas Portero Gil Vicente:</b> Over 4.5 Paradas\n\n"
-            "💡 <b>ANÁLISIS TÁCTICO DE PREVIA:</b>\n"
-            "Braga cuenta con un potencial ofensivo netamente superior en su feudo, imprimiendo una presión muy alta desde el silbato inicial. Gil Vicente sufrirá encerrado en su propia área frente a la llegada constante por bandas del cuadro local."
-        )
-    },
-    {
-        "code": "ENG-TOT-COV",
-        "text": (
-            "🏴󠁧󠁢󠁥󠁮󠁧󠁿 <b>INGLATERRA - PREMIER LEAGUE</b>\n"
-            "⏰ <b>Hora:</b> 21:00 CEST | ⚔️ <b>Tottenham vs Coventry</b>\n\n"
-            "📊 <b>CÓDIGO DE SEGUIMIENTO:</b> <code>ENG-TOT-COV</code>\n\n"
-            "• ⚽ <b>xG Proyectado:</b> 2.40 vs 0.80 | Over 2.5 / Over 3.0 Goles\n"
-            "• 🏆 <b>Pick Resultado:</b> Victoria Tottenham + Over 1.5 Goles [Cuota 1.53]\n"
-            "• 🚩 <b>Córners totales:</b> Over 10.5 Córners Totales\n"
-            "• 🟨 <b>Tarjetas totales:</b> Over 3.5 Tarjetas Totales\n"
-            "• 🎯 <b>Remates a puerta:</b> Tottenham (7.1) vs Coventry (2.9)\n"
-            "• 🧤 <b>Paradas Portero Coventry:</b> Over 4.5 Paradas\n\n"
-            "💡 <b>ANÁLISIS TÁCTICO DE PREVIA:</b>\n"
-            "Tottenham despliega un bloque de ataque total con posesiones prolongadas e incursiones constantes por los costados. Coventry sufrirá un desgaste físico abrumador defendiendo en campo propio. Esperamos una victoria clara y holgada de los Spurs."
-        )
-    },
-    {
-        "code": "ESP-GET-RAY",
-        "text": (
-            "🇪🇸 <b>ESPAÑA - LALIGA EA SPORTS</b>\n"
-            "⏰ <b>Hora:</b> 21:00 CEST | ⚔️ <b>Getafe vs Rayo Vallecano</b>\n\n"
-            "📊 <b>CÓDIGO DE SEGUIMIENTO:</b> <code>ESP-GET-RAY</code>\n\n"
-            "• ⚽ <b>xG Proyectado:</b> 1.05 vs 0.95 | Under 2.5 Goles\n"
-            "• 🏆 <b>Pick Resultado:</b> Empate o Rayo Vallecano (HA 0.0) [Cuota 1.85 / Directo 2.60]\n"
-            "• 🚩 <b>Córners totales:</b> Under 9.5 Córners Totales\n"
-            "• 🟨 <b>Tarjetas totales:</b> Over 5.5 Tarjetas Totales\n"
-            "• 🎯 <b>Remates a puerta:</b> Getafe (3.2) vs Rayo Vallecano (3.5)\n"
-            "• 🧤 <b>Paradas Porteros:</b> Over 2.5 Paradas cada uno\n\n"
-            "💡 <b>ANÁLISIS TÁCTICO DE PREVIA:</b>\n"
-            "Derbi del sur de Madrid caracterizado por la intensidad física, juego directo y constantes faltas. Getafe propone un bloque rocoso que concede muy poco espacio, mientras que el Rayo busca transiciones veloces. La igualdad es máxima, por lo que respaldar la cobertura del Rayo en hándicap ofrece un valor excelente."
-        )
-    }
-]
+SUMMARY_TEXT = (
+    "🏁 <b>BALANCE Y RECUENTO OFICIAL DE LA JORNADA</b> 🏁\n\n"
+    "Familia, repasamos con total transparencia los resultados oficiales con los códigos de seguimiento de hoy en <b>@FreeTopTip</b>:\n\n"
+    "✅ <b>PICKS ACERTADOS / VERDES:</b>\n"
+    "• 🟢 <code>ENG-TOT-COV</code> | <b>Tottenham vs Coventry:</b> Victoria Tottenham + Over 1.5 [ACERTADO - Victoria 3-1] [Cuota 1.53]\n"
+    "• 🟢 <code>ITA-MON-CAG</code> | <b>Monza vs Cagliari:</b> Monza HA 0.0 [ACERTADO - Goleada 4-0] [Cuota 1.62]\n"
+    "• 🟢 <code>ITA-PAR-TOR</code> | <b>Parma vs Torino:</b> Torino HA 0.0 [ACERTADO - Victoria 0-3] [Cuota 1.70]\n\n"
+    "🔄 <b>PICKS NULOS / DEVOLUCIÓN:</b>\n"
+    "• 🔄 <code>ESP-GET-RAY</code> | <b>Getafe vs Rayo Vallecano:</b> Rayo Vallecano HA 0.0 [NULO - Empate 1-1 / Devolución] [Cuota 1.85]\n\n"
+    "❌ <b>PICKS FALLADOS:</b>\n"
+    "• 🔴 <code>TUR-TRAB-BESIK</code> | <b>Trabzonspor vs Beşiktaş:</b> Ambos Anotan [FALLADO - Victoria 2-0 Trabzonspor]\n"
+    "• 🔴 <code>POR-BRA-GIL</code> | <b>Braga vs Gil Vicente:</b> Victoria Braga Directa [FALLADO - Victoria 1-2 Gil Vicente]\n\n"
+    "📊 <b>ESTADÍSTICAS GLOBALES DEL DÍA:</b>\n"
+    "• 🎯 <b>Aciertos (Verdes):</b> 3\n"
+    "• 🔄 <b>Nulos (Devolución):</b> 1\n"
+    "• ❌ <b>Fallos:</b> 2\n"
+    "• 💰 <b>BALANCE NETO:</b> <b>+0.85 Unidades Netas (+0.85 U)</b>\n\n"
+    "🔥 <i>¡Cerramos la jornada en verde (+0.85U) gracias al pleno en Italia e Inglaterra y la protección de nuestro hándicap en España!</i>"
+)
 
 # ---------------------------------------------------------
-# Función de Envío Al Canal
+# Tarea de Publicación Automática
 # ---------------------------------------------------------
-async def publish_picks(context: ContextTypes.DEFAULT_TYPE):
+async def publish_summary(context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
-    logging.info("Enviando publicaciones completas con códigos...")
+    logging.info("Publicando el resumen oficial con códigos y resultados...")
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("💬 UNIRSE AL VIP / CONTACTO DIRECTO", url="https://t.me/Mark122")]
     ])
 
-    for match in MATCH_PICKS:
-        try:
-            await bot.send_message(
-                chat_id=TELEGRAM_CHAT_ID,
-                text=match["text"],
-                parse_mode="HTML",
-                reply_markup=keyboard
-            )
-            logging.info(f"Publicado pick con código: {match['code']}")
-            time.sleep(3)
-        except Exception as e:
-            logging.error(f"Error publicando {match['code']}: {e}")
+    try:
+        await bot.send_message(
+            chat_id=TELEGRAM_CHAT_ID,
+            text=SUMMARY_TEXT,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        logging.info("Resumen publicado con éxito.")
+    except Exception as e:
+        logging.error(f"Error al enviar el resumen: {e}")
 
 # ---------------------------------------------------------
-# Función Start
+# Controladores del Bot
 # ---------------------------------------------------------
 async def start_command(update: object, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
@@ -156,13 +75,13 @@ async def start_command(update: object, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ---------------------------------------------------------
-# Ejecución Principal
+# Función Principal
 # ---------------------------------------------------------
 def main():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     if application.job_queue:
-        application.job_queue.run_once(publish_picks, when=5)
+        application.job_queue.run_once(publish_summary, when=5)
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("vip", start_command))
