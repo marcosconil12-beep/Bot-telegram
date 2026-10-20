@@ -10,13 +10,14 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # ---------------------------------------------------------
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAHdtvCjS5o4_-p2Bk7w6mSDBBA2gbHi470")
+# Token asignado directamente
+TELEGRAM_BOT_TOKEN = "8657360203:AAHdtvCjS5o4_-p2Bk7w6mSDBBA2gbHi470"
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # ---------------------------------------------------------
-# Resumen Oficial con Resultados Reales Exactos
+# Resumen Oficial con Resultados Reales
 # ---------------------------------------------------------
 SUMMARY_TEXT = (
     "🏁 <b>BALANCE Y RECUENTO OFICIAL DE LA JORNADA DE CHAMPIONS</b> 🏁\n\n"
@@ -63,7 +64,7 @@ async def publish_summary(context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML",
             reply_markup=keyboard
         )
-        logging.info("Resumen corregido publicado con éxito.")
+        logging.info("Resumen publicado con éxito.")
     except Exception as e:
         logging.error(f"Error al enviar el resumen: {e}")
 
