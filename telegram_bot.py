@@ -10,63 +10,211 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # ---------------------------------------------------------
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# Token asignado directamente
-TELEGRAM_BOT_TOKEN = "8657360203:AAHdtvCjS5o4_-p2Bk7w6mSDBBA2gbHi470"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAHt1LtezpuWJGr3lbpFBBKDi3iblEQmzFM")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # ---------------------------------------------------------
-# Resumen Oficial con Resultados Reales
+# Publicaciones de Análisis por Partido (Códigos Unicos)
 # ---------------------------------------------------------
-SUMMARY_TEXT = (
-    "🏁 <b>BALANCE Y RECUENTO OFICIAL DE LA JORNADA DE CHAMPIONS</b> 🏁\n\n"
-    "Familia, repasamos con total transparencia los resultados de los partidos analizados hoy en <b>@FreeTopTip</b>:\n\n"
-    "✅ <b>PICKS ACERTADOS / VERDES:</b>\n"
-    "• 🟢 <code>UCL-FEN-SLA</code> | <b>Fenerbahçe vs Slavia Praga:</b> Victoria Fenerbahçe [ACERTADO por 2 Goles de Ventaja ⚡] [Cuota 1.61]\n"
-    "• 🟢 <code>UCL-SAB-DOR</code> | <b>Sabah vs Dortmund:</b> Dortmund HA -1.5 [ACERTADO - Victoria 0-3] [Cuota 1.75]\n"
-    "• 🟢 <code>UCL-LIV-VIL</code> | <b>Liverpool vs Villarreal:</b> Victoria Liverpool + Over 1.5 [ACERTADO - Victoria 3-1] [Cuota 1.72]\n"
-    "• 🟢 <code>UCL-MCI-AEK</code> | <b>Man City vs AEK Atenas:</b> Man City HA -2.5 [ACERTADO - Goleada 4-0] [Cuota 1.85]\n"
-    "• 🟢 <code>UCL-NAP-BOD</code> | <b>Nápoles vs Bodo/Glimt:</b> Victoria Nápoles [ACERTADO - Victoria 2-0] [Cuota 1.61]\n"
-    "• 🟢 <code>UCL-PSG-BAR</code> | <b>PSG vs Barcelona:</b> Ambos Anotan + Over 2.5 [ACERTADO - Marcador 2-2] [Cuota 1.70]\n"
-    "• 🟢 <code>UCL-ROM-SLO</code> | <b>Roma vs Slovan Bratislava:</b> Roma HA -1.5 [ACERTADO - Victoria 3-0] [Cuota 1.55]\n"
-    "• 🟢 <code>UCL-STU-ATM</code> | <b>Stuttgart vs At. Madrid:</b> At. Madrid HA 0.0 [ACERTADO - Victoria 1-2] [Cuota 1.55]\n\n"
-    "❌ <b>PICKS FALLADOS:</b>\n"
-    "• 🔴 <code>UCL-OPO-PSV</code> | <b>Oporto vs PSV:</b> Ambos Equipos Anotan [FALLADO - Marcador 0-1]\n\n"
-    "📊 <b>ESTADÍSTICAS TOTALES DE LA JORNADA:</b>\n"
-    "• 🎯 <b>Aciertos (Verdes):</b> 8\n"
-    "• 🔄 <b>Nulos:</b> 0\n"
-    "• ❌ <b>Fallos:</b> 1\n"
-    "• 💰 <b>BALANCE NETO DEL DÍA:</b> <b>+3.34 Unidades Netas (+3.34 U)</b>\n\n"
-    "───────────────\n"
-    "🔥 <b>¡8 VERDES DE 9 EN UNA JORNADA ESPECTACULAR!</b> 🔥\n\n"
-    "Cerramos otro día sumando +3.34U de beneficio neto gracias al análisis métrico de la Champions League. La consistencia sigue siendo nuestra mayor garantía.\n\n"
-    "🚨 <b>OFERTA FLASH VIP PREMIUM</b> 🚨\n"
-    "Consigue acceso al <b>Canal VIP Premium</b> para lo que resta de semana por solo <b>9,99€</b> (Precio habitual 29,99€).\n\n"
-    "👇 <b>PULSA ABAJO Y ÚNETE AL VIP AHORA:</b>"
-)
+MATCH_POSTS = [
+    {
+        "code": "JPN-FAG-MIT",
+        "text": (
+            "🇯🇵 <b>JAPÓN: Fagiano Okayama vs Mito Hollyhock</b> (12:00 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-FAG-MIT</code>\n"
+            "⚽ <b>Partido:</b> Fagiano Okayama vs Mito Hollyhock\n"
+            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "El Fagiano Okayama mantendrá la iniciativa atacando por bandas. Mito Hollyhock replegará en bloque bajo buscando frenar con faltas el juego directo local.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Más de 8.5 Córners Totales\n"
+            "🧤 <b>Paradas:</b> Portero Mito Hollyhock: Más de 3.5 Paradas\n"
+            "🟨 <b>Tarjetas:</b> Más de 3.5 Tarjetas Totales\n"
+            "🎯 <b>Remates a Puerta:</b> Fagiano: Más de 4.5 Remates a puerta\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Fagiano Okayama\n"
+            "💰 <b>Cuota:</b> 1.71 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 1.5/10"
+        )
+    },
+    {
+        "code": "JPN-TOK-KAS",
+        "text": (
+            "🇯🇵 <b>JAPÓN: FC Tokyo vs Kashiwa Reysol</b> (12:00 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-TOK-KAS</code>\n"
+            "⚽ <b>Partido:</b> FC Tokyo vs Kashiwa Reysol\n"
+            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "Partido abierto con transiciones rápidas de área a área. La fragilidad defensiva en los centros provocará muchas intervenciones de ambos guardametas.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Más de 9.5 Córners Totales\n"
+            "🧤 <b>Paradas:</b> Ambos Porteros: Más de 2.5 Paradas c/u\n"
+            "🟨 <b>Tarjetas:</b> Más de 4.5 Tarjetas Totales\n"
+            "🎯 <b>Remates a Puerta:</b> Más de 8.5 Remates a puerta totales\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Ambos Equipos Anotan (Sí)\n"
+            "💰 <b>Cuota:</b> 1.70 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 1.5/10"
+        )
+    },
+    {
+        "code": "JPN-KAW-VIS",
+        "text": (
+            "🇯🇵 <b>JAPÓN: Kawasaki Frontale vs Vissel Kobe</b> (12:00 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-KAW-VIS</code>\n"
+            "⚽ <b>Partido:</b> Kawasaki Frontale vs Vissel Kobe\n"
+            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "Choque de trenes con altísima intensidad física y volumen de disparos elevado desde fuera y dentro del área.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Más de 10.5 Córners Totales\n"
+            "🧤 <b>Paradas:</b> Portero Kawasaki: Más de 3.5 Paradas\n"
+            "🟨 <b>Tarjetas:</b> Más de 4.5 Tarjetas Totales\n"
+            "🎯 <b>Remates a Puerta:</b> Más de 9.5 Remates a puerta totales\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Más de 2.5 Goles\n"
+            "💰 <b>Cuota:</b> 1.75 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 1.5/10"
+        )
+    },
+    {
+        "code": "JPN-KYO-KAS",
+        "text": (
+            "🇯🇵 <b>JAPÓN: Kyoto Sanga FC vs Kashima Antlers</b> (12:00 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-KYO-KAS</code>\n"
+            "⚽ <b>Partido:</b> Kyoto Sanga FC vs Kashima Antlers\n"
+            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "Kashima volcará el juego en campo rival. Kyoto sufrirá en las marcas individuales acumulando faltas y amonestaciones.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Más de 9.5 Córners Totales\n"
+            "🧤 <b>Paradas:</b> Portero Kyoto Sanga: Más de 4.5 Paradas\n"
+            "🟨 <b>Tarjetas:</b> Kyoto Sanga: Más de 2.5 Tarjetas\n"
+            "🎯 <b>Remates a Puerta:</b> Kashima: Más de 4.5 Remates a puerta\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Kashima Antlers\n"
+            "💰 <b>Cuota:</b> 1.91 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 1.5/10"
+        )
+    },
+    {
+        "code": "JPN-NAG-CER",
+        "text": (
+            "🇯🇵 <b>JAPÓN: Nagoya Grampus vs Cerezo Osaka</b> (12:00 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-NAG-CER</code>\n"
+            "⚽ <b>Partido:</b> Nagoya Grampus vs Cerezo Osaka\n"
+            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "Planteamiento táctico muy rocoso de Nagoya. Dominio del juego aéreo en el área con pocos espacios interiores.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Más de 8.5 Córners Totales\n"
+            "🧤 <b>Paradas:</b> Portero Cerezo Osaka: Más de 3.5 Paradas\n"
+            "🟨 <b>Tarjetas:</b> Más de 3.5 Tarjetas Totales\n"
+            "🎯 <b>Remates a Puerta:</b> Nagoya: Más de 3.5 Remates a puerta\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Nagoya Grampus - Empate No Válido (DNB)\n"
+            "💰 <b>Cuota:</b> 1.57 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 2/10"
+        )
+    },
+    {
+        "code": "JPN-SHI-MAC",
+        "text": (
+            "🇯🇵 <b>JAPÓN: Shimizu S-Pulse vs Machida Zelvia</b> (12:00 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-SHI-MAC</code>\n"
+            "⚽ <b>Partido:</b> Shimizu S-Pulse vs Machida Zelvia\n"
+            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "Machida castigará al contragolpe. El empuje de Shimizu generará muchos saques de esquina pero también concesiones defensivas.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Más de 9.5 Córners Totales\n"
+            "🧤 <b>Paradas:</b> Portero Machida Zelvia: Más de 3.5 Paradas\n"
+            "🟨 <b>Tarjetas:</b> Más de 4.5 Tarjetas Totales\n"
+            "🎯 <b>Remates a Puerta:</b> Ambos: Más de 3.5 Remates a puerta c/u\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Machida Zelvia\n"
+            "💰 <b>Cuota:</b> 2.05 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 1/10"
+        )
+    },
+    {
+        "code": "JPN-NAG-SAN",
+        "text": (
+            "🇯🇵 <b>JAPÓN: V-Varen Nagasaki vs Sanfrecce Hiroshima</b> (12:00 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-NAG-SAN</code>\n"
+            "⚽ <b>Partido:</b> V-Varen Nagasaki vs Sanfrecce Hiroshima\n"
+            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "Monopolio absoluto de la pelota por parte de Sanfrecce Hiroshima, exigiendo constantemente al meta rival bajo palos.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Sanfrecce Hiroshima: Más de 5.5 Córners\n"
+            "🧤 <b>Paradas:</b> Portero V-Varen Nagasaki: Más de 4.5 Paradas\n"
+            "🟨 <b>Tarjetas:</b> V-Varen Nagasaki: Más de 2.5 Tarjetas\n"
+            "🎯 <b>Remates a Puerta:</b> Sanfrecce: Más de 5.5 Remates a puerta\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Sanfrecce Hiroshima HA -1.0\n"
+            "💰 <b>Cuota:</b> 1.65 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 1.5/10"
+        )
+    },
+    {
+        "code": "JPN-YOK-VER",
+        "text": (
+            "🇯🇵 <b>JAPÓN: Yokohama F-Marinos vs Tokyo Verdy</b> (12:00 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-YOK-VER</code>\n"
+            "⚽ <b>Partido:</b> Yokohama F-Marinos vs Tokyo Verdy\n"
+            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "Asedio continuo de los Marinos por los costados con centros laterales bloqueados y constante flujo de disparos a puerta.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Yokohama F-Marinos: Más de 6.5 Córners\n"
+            "🧤 <b>Paradas:</b> Portero Tokyo Verdy: Más de 4.5 Paradas\n"
+            "🟨 <b>Tarjetas:</b> Más de 3.5 Tarjetas Totales\n"
+            "🎯 <b>Remates a Puerta:</b> Yokohama: Más de 5.5 Remates a puerta\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Yokohama F-Marinos\n"
+            "💰 <b>Cuota:</b> 1.81 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 1.5/10"
+        )
+    },
+    {
+        "code": "JPN-URA-JEF",
+        "text": (
+            "🇯🇵 <b>JAPÓN: Urawa Red Diamonds vs JEF Utd Chiba</b> (12:30 CEST)\n\n"
+            "📌 <b>Código Pick:</b> <code>JPN-URA-JEF</code>\n"
+            "⚽ <b>Partido:</b> Urawa Red Diamonds vs JEF Utd Chiba\n"
+            "⏰ <b>Hora:</b> 12:30 CEST\n\n"
+            "🧠 <b>ANÁLISIS TÁCTICO Y MÉTRICO:</b>\n"
+            "Urawa encerrará a Chiba en su área. El desgaste defensivo visitante provocará cortes tácticos y faltas reiteradas.\n\n"
+            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
+            "🚩 <b>Córners:</b> Más de 9.5 Córners Totales\n"
+            "🧤 <b>Paradas:</b> Portero JEF Utd Chiba: Más de 4.5 Paradas\n"
+            "🟨 <b>Tarjetas:</b> JEF Utd Chiba: Más de 2.5 Tarjetas\n"
+            "🎯 <b>Remates a Puerta:</b> Urawa: Más de 5.5 Remates a puerta\n\n"
+            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Urawa Red Diamonds\n"
+            "💰 <b>Cuota:</b> 1.62 (Bet365)\n"
+            "📊 <b>Stake Sugerido:</b> 2/10"
+        )
+    }
+]
 
 # ---------------------------------------------------------
 # Tarea de Publicación Automática
 # ---------------------------------------------------------
-async def publish_summary(context: ContextTypes.DEFAULT_TYPE):
+async def publish_all_picks(context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
-    logging.info("Publicando el resumen con resultados reales del día...")
+    logging.info("Iniciando envío de picks para la jornada japonesa...")
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔥 UNIRSE AL VIP POR 9,99€ (CLICK AQUÍ)", url="https://t.me/Mark122")]
     ])
 
-    try:
-        await bot.send_message(
-            chat_id=TELEGRAM_CHAT_ID,
-            text=SUMMARY_TEXT,
-            parse_mode="HTML",
-            reply_markup=keyboard
-        )
-        logging.info("Resumen publicado con éxito.")
-    except Exception as e:
-        logging.error(f"Error al enviar el resumen: {e}")
+    for post in MATCH_POSTS:
+        try:
+            await bot.send_message(
+                chat_id=TELEGRAM_CHAT_ID,
+                text=post["text"],
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+            logging.info(f"Publicado pick: {post['code']}")
+            time.sleep(2)
+        except Exception as e:
+            logging.error(f"Error al enviar {post['code']}: {e}")
 
 # ---------------------------------------------------------
 # Controladores del Bot
@@ -90,7 +238,7 @@ def main():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     if application.job_queue:
-        application.job_queue.run_once(publish_summary, when=5)
+        application.job_queue.run_once(publish_all_picks, when=5)
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("vip", start_command))
