@@ -11,6 +11,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8665484015:AAF1zLm4wuAItvQiqI2K-dmmyFn1hjzNUOk")
+# Si tienes el ID numérico de @userinfobot ponlo aquí (ejemplo: "-1001234567890")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
@@ -197,7 +198,7 @@ MATCH_POSTS = [
 # ---------------------------------------------------------
 async def publish_all_picks(context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
-    logging.info("Iniciando envío de picks para la jornada japonesa con el bot nuevo...")
+    logging.info("Reintentando envío de picks...")
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔥 UNIRSE AL VIP POR 9,99€ (CLICK AQUÍ)", url="https://t.me/Mark122")]
