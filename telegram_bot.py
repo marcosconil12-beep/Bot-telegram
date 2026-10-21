@@ -16,226 +16,86 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # ---------------------------------------------------------
-# Análisis Detallados por Partido (Estilo Champions)
+# 1. Resumen de Resultados Reales de la Jornada Japonesa
 # ---------------------------------------------------------
-MATCH_POSTS = [
-    {
-        "code": "JPN-FAG-MIT",
-        "text": (
-            "🇯🇵 <b>JAPÓN: Fagiano Okayama vs Mito Hollyhock</b> (12:00 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-FAG-MIT</code>\n"
-            "⚽ <b>Partido:</b> Fagiano Okayama vs Mito Hollyhock\n"
-            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> xG Fagiano (1.65) | xG Mito (0.85) | Disparos/p: 13.2 vs 8.4\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "El Fagiano Okayama impone un ritmo alto como local atacando las bandas. Mito Hollyhock sufre para sostener el balón fuera de casa y tiende a recurrir a la falta táctica para cortar transiciones.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Más de 8.5 Córners Totales\n"
-            "🧤 <b>Paradas:</b> Portero Mito Hollyhock: Más de 3.5 Paradas\n"
-            "🟨 <b>Tarjetas:</b> Más de 3.5 Tarjetas Totales\n"
-            "🎯 <b>Remates a Puerta:</b> Fagiano: Más de 4.5 Remates a puerta\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Fagiano Okayama\n"
-            "💰 <b>Cuota:</b> 1.71 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 1.5/10"
-        )
-    },
-    {
-        "code": "JPN-TOK-KAS",
-        "text": (
-            "🇯🇵 <b>JAPÓN: FC Tokyo vs Kashiwa Reysol</b> (12:00 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-TOK-KAS</code>\n"
-            "⚽ <b>Partido:</b> FC Tokyo vs Kashiwa Reysol\n"
-            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> xGA FC Tokyo (1.52) | xGA Kashiwa (1.48) | Remates/p: 24.5 totales\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "Encuentro de ida y vuelta constante. La fragilidad defensiva en los centros provoca intervenciones continuas de ambos guardametas.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Más de 9.5 Córners Totales\n"
-            "🧤 <b>Paradas:</b> Ambos Porteros: Más de 2.5 Paradas c/u\n"
-            "🟨 <b>Tarjetas:</b> Más de 4.5 Tarjetas Totales\n"
-            "🎯 <b>Remates a Puerta:</b> Más de 8.5 Remates a puerta totales\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Ambos Equipos Anotan (Sí)\n"
-            "💰 <b>Cuota:</b> 1.70 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 1.5/10"
-        )
-    },
-    {
-        "code": "JPN-KAW-VIS",
-        "text": (
-            "🇯🇵 <b>JAPÓN: Kawasaki Frontale vs Vissel Kobe</b> (12:00 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-KAW-VIS</code>\n"
-            "⚽ <b>Partido:</b> Kawasaki Frontale vs Vissel Kobe\n"
-            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> Promedio xG acumulado: 3.10 | Posesión media: 58% vs 54%\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "Choque estrella de la jornada. Ambas escuadras destacan por una presión asfixiante tras pérdida y transiciones ofensivas hiperdirectas.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Más de 10.5 Córners Totales\n"
-            "🧤 <b>Paradas:</b> Portero Kawasaki: Más de 3.5 Paradas\n"
-            "🟨 <b>Tarjetas:</b> Más de 4.5 Tarjetas Totales\n"
-            "🎯 <b>Remates a Puerta:</b> Más de 9.5 Remates a puerta totales\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Más de 2.5 Goles\n"
-            "💰 <b>Cuota:</b> 1.75 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 1.5/10"
-        )
-    },
-    {
-        "code": "JPN-KYO-KAS",
-        "text": (
-            "🇯🇵 <b>JAPÓN: Kyoto Sanga FC vs Kashima Antlers</b> (12:00 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-KYO-KAS</code>\n"
-            "⚽ <b>Partido:</b> Kyoto Sanga FC vs Kashima Antlers\n"
-            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> xG Kashima (1.78) | xG Kyoto (0.95) | Eficiencia en área: 68%\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "Kashima Antlers somete con juego combinativo. Kyoto Sanga sufre en los repliegues obligándose a cometer amonestaciones.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Más de 9.5 Córners Totales\n"
-            "🧤 <b>Paradas:</b> Portero Kyoto Sanga: Más de 4.5 Paradas\n"
-            "🟨 <b>Tarjetas:</b> Kyoto Sanga: Más de 2.5 Tarjetas\n"
-            "🎯 <b>Remates a Puerta:</b> Kashima: Más de 4.5 Remates a puerta\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Kashima Antlers\n"
-            "💰 <b>Cuota:</b> 1.91 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 1.5/10"
-        )
-    },
-    {
-        "code": "JPN-NAG-CER",
-        "text": (
-            "🇯🇵 <b>JAPÓN: Nagoya Grampus vs Cerezo Osaka</b> (12:00 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-NAG-CER</code>\n"
-            "⚽ <b>Partido:</b> Nagoya Grampus vs Cerezo Osaka\n"
-            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> Goles encajados/p Nagoya: 0.8 | xGA Cerezo fuera: 1.62\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "Nagoya domina la faceta defensiva con bloque inexpugnable. Cerezo Osaka acusa la falta de efectividad fuera de su feudo.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Más de 8.5 Córners Totales\n"
-            "🧤 <b>Paradas:</b> Portero Cerezo Osaka: Más de 3.5 Paradas\n"
-            "🟨 <b>Tarjetas:</b> Más de 3.5 Tarjetas Totales\n"
-            "🎯 <b>Remates a Puerta:</b> Nagoya: Más de 3.5 Remates a puerta\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Nagoya Grampus - Empate No Válido (DNB)\n"
-            "💰 <b>Cuota:</b> 1.57 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 2/10"
-        )
-    },
-    {
-        "code": "JPN-SHI-MAC",
-        "text": (
-            "🇯🇵 <b>JAPÓN: Shimizu S-Pulse vs Machida Zelvia</b> (12:00 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-SHI-MAC</code>\n"
-            "⚽ <b>Partido:</b> Shimizu S-Pulse vs Machida Zelvia\n"
-            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> Conversión contragolpe Machida: 22% | Córners a favor Shimizu: 6.8/p\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "Machida Zelvia aprovecha los espacios a la espalda de los laterales. Shimizu acumula efectivos arriba provocando córners pero sufriendo atrás.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Más de 9.5 Córners Totales\n"
-            "🧤 <b>Paradas:</b> Portero Machida Zelvia: Más de 3.5 Paradas\n"
-            "🟨 <b>Tarjetas:</b> Más de 4.5 Tarjetas Totales\n"
-            "🎯 <b>Remates a Puerta:</b> Ambos: Más de 3.5 Remates a puerta c/u\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Machida Zelvia\n"
-            "💰 <b>Cuota:</b> 2.05 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 1/10"
-        )
-    },
-    {
-        "code": "JPN-NAG-SAN",
-        "text": (
-            "🇯🇵 <b>JAPÓN: V-Varen Nagasaki vs Sanfrecce Hiroshima</b> (12:00 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-NAG-SAN</code>\n"
-            "⚽ <b>Partido:</b> V-Varen Nagasaki vs Sanfrecce Hiroshima\n"
-            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> Posesión Sanfrecce: 62% | Disparos a puerta Sanfrecce: 6.5/p\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "Clara brecha de jerarquía individual. Sanfrecce encerrará a Nagasaki en su propio campo exigiendo intervenciones constantes al meta local.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Sanfrecce Hiroshima: Más de 5.5 Córners\n"
-            "🧤 <b>Paradas:</b> Portero V-Varen Nagasaki: Más de 4.5 Paradas\n"
-            "🟨 <b>Tarjetas:</b> V-Varen Nagasaki: Más de 2.5 Tarjetas\n"
-            "🎯 <b>Remates a Puerta:</b> Sanfrecce: Más de 5.5 Remates a puerta\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Sanfrecce Hiroshima HA -1.0\n"
-            "💰 <b>Cuota:</b> 1.65 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 1.5/10"
-        )
-    },
-    {
-        "code": "JPN-YOK-VER",
-        "text": (
-            "🇯🇵 <b>JAPÓN: Yokohama F-Marinos vs Tokyo Verdy</b> (12:00 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-YOK-VER</code>\n"
-            "⚽ <b>Partido:</b> Yokohama F-Marinos vs Tokyo Verdy\n"
-            "⏰ <b>Hora:</b> 12:00 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> xG Yokohama en casa: 2.05 | Centros al área: 18.4/p\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "Yokohama somete mediante amplitud por bandas con extremos encaradores. Tokyo Verdy intentará resistir en bloque bajo.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Yokohama F-Marinos: Más de 6.5 Córners\n"
-            "🧤 <b>Paradas:</b> Portero Tokyo Verdy: Más de 4.5 Paradas\n"
-            "🟨 <b>Tarjetas:</b> Más de 3.5 Tarjetas Totales\n"
-            "🎯 <b>Remates a Puerta:</b> Yokohama: Más de 5.5 Remates a puerta\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Yokohama F-Marinos\n"
-            "💰 <b>Cuota:</b> 1.81 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 1.5/10"
-        )
-    },
-    {
-        "code": "JPN-URA-JEF",
-        "text": (
-            "🇯🇵 <b>JAPÓN: Urawa Red Diamonds vs JEF Utd Chiba</b> (12:30 CEST)\n\n"
-            "📌 <b>Código Pick:</b> <code>JPN-URA-JEF</code>\n"
-            "⚽ <b>Partido:</b> Urawa Red Diamonds vs JEF Utd Chiba\n"
-            "⏰ <b>Hora:</b> 12:30 CEST\n\n"
-            "📊 <b>MÉTRICAS CLAVE:</b> Posesión Urawa en casa: 60% | xGA JEF Chiba: 1.70\n\n"
-            "🧠 <b>ANÁLISIS TÁCTICO AVANZADO:</b>\n"
-            "En el Saitama Stadium, Urawa impone un ritmo de juego atosigante. JEF Chiba acumulará faltas tácticas para frenar la sangría.\n\n"
-            "📊 <b>MERCADOS SECUNDARIOS DEL PARTIDO:</b>\n"
-            "🚩 <b>Córners:</b> Más de 9.5 Córners Totales\n"
-            "🧤 <b>Paradas:</b> Portero JEF Utd Chiba: Más de 4.5 Paradas\n"
-            "🟨 <b>Tarjetas:</b> JEF Utd Chiba: Más de 2.5 Tarjetas\n"
-            "🎯 <b>Remates a Puerta:</b> Urawa: Más de 5.5 Remates a puerta\n\n"
-            "🎯 <b>PRONÓSTICO PRINCIPAL:</b> Victoria Urawa Red Diamonds\n"
-            "💰 <b>Cuota:</b> 1.62 (Bet365)\n"
-            "📊 <b>Stake Sugerido:</b> 2/10"
-        )
-    }
-]
+JAPAN_RESULTS_POST = {
+    "code": "JPN-RESULTS-SUMMARY",
+    "text": (
+        "🇯🇵 <b>RECAP Y RESULTADOS REALES - JORNADA JAPÓN</b> 🇯🇵\n\n"
+        "¡Finalizados todos los partidos de la jornada matutina en Japón! Aquí tenéis el desglose oficial de marcadores:\n\n"
+        "✅ <b>Fagiano Okayama 2 - 0 Mito Hollyhock</b>\n"
+        "➖ <b>FC Tokyo 0 - 0 Kashiwa Reysol</b>\n"
+        "✅ <b>Kawasaki Frontale 2 - 1 Vissel Kobe</b>\n"
+        "➖ <b>Kyoto Sanga FC 2 - 2 Kashima Antlers</b>\n"
+        "➖ <b>Nagoya Grampus 1 - 1 Cerezo Osaka</b>\n"
+        "✅ <b>Shimizu S-Pulse 0 - 5 Machida Zelvia</b>\n"
+        "❌ <b>V-Varen Nagasaki 4 - 0 Sanfrecce Hiroshima</b>\n"
+        "➖ <b>Yokohama F-Marinos 2 - 2 Tokyo Verdy</b>\n"
+        "✅ <b>Urawa Red Diamonds 3 - 2 JEF Utd Chiba</b>\n\n"
+        "📌 <i>Seguimos ajustando y sumando en las ligas internacionales.</i>"
+    )
+}
+
+# ---------------------------------------------------------
+# 2. Anuncio Especial Champions League & Promo Premium
+# ---------------------------------------------------------
+CHAMPIONS_ANNOUNCEMENT_POST = {
+    "code": "UCL-PROMO-ANNOUNCEMENT",
+    "text": (
+        "🔥 <b>¡ATENCIÓN FAMILIA! HOY TENEMOS CHAMPIONS LEAGUE</b> 🔥\n\n"
+        "Para la jornada europea de hoy, <b>publicaremos en abierto únicamente UN PARTIDO que nos encanta</b> con un análisis completísimo y de máximo valor.\n\n"
+        "🔒 <b>El resto de la jornada de Champions League queda reservada en exclusiva para nuestro grupo PREMIUM.</b>\n\n"
+        "🎁 <b>PROMOCIÓN ESPECIAL GRATUITA:</b>\n"
+        "Dejaremos el acceso al canal <b>PREMIUM COMPLETAMENTE GRATUITO</b> desde este momento <b>hasta las 16:45 CEST</b>.\n\n"
+        "📩 Todo el que quiera acceder de manera gratuita solo tiene que hablarme directamente al privado antes de las 16:45 CEST.\n\n"
+        "👇 <b>¡PULSA AQUÍ PARA ENTRAR GRATIS AL PREMIUM!</b>"
+    )
+}
 
 # ---------------------------------------------------------
 # Tarea de Publicación Automática
 # ---------------------------------------------------------
 async def publish_all_picks(context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
-    logging.info("Iniciando envío de picks con formato completo Champions...")
+    logging.info("Iniciando publicación del resumen de Japón y promoción Champions...")
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔥 UNIRSE AL VIP POR 9,99€ (CLICK AQUÍ)", url="https://t.me/Mark122")]
+    keyboard_vip = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💬 HABLAR AL PRIVADO / ENTRAR GRATIS AL PREMIUM", url="https://t.me/Mark122")]
     ])
 
-    for post in MATCH_POSTS:
-        try:
-            await bot.send_message(
-                chat_id=TELEGRAM_CHAT_ID,
-                text=post["text"],
-                parse_mode="HTML",
-                reply_markup=keyboard
-            )
-            logging.info(f"Publicado pick: {post['code']}")
-            time.sleep(2)
-        except Exception as e:
-            logging.error(f"Error al enviar {post['code']}: {e}")
+    try:
+        # Enviar resumen de resultados
+        await bot.send_message(
+            chat_id=TELEGRAM_CHAT_ID,
+            text=JAPAN_RESULTS_POST["text"],
+            parse_mode="HTML"
+        )
+        logging.info("Publicado el resumen de resultados de Japón.")
+        time.sleep(3)
+
+        # Enviar anuncio de Champions League y Promoción
+        await bot.send_message(
+            chat_id=TELEGRAM_CHAT_ID,
+            text=CHAMPIONS_ANNOUNCEMENT_POST["text"],
+            parse_mode="HTML",
+            reply_markup=keyboard_vip
+        )
+        logging.info("Publicado el anuncio de la Champions y promo Premium.")
+
+    except Exception as e:
+        logging.error(f"Error al enviar publicaciones: {e}")
 
 # ---------------------------------------------------------
 # Controladores del Bot
 # ---------------------------------------------------------
 async def start_command(update: object, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💬 UNIRSE AL VIP (9,99€)", url="https://t.me/Mark122")]
+        [InlineKeyboardButton("💬 ENTRAR GRATIS AL PREMIUM", url="https://t.me/Mark122")]
     ])
     if hasattr(update, 'message') and update.message:
         await update.message.reply_text(
             "👋 <b>¡Hola! Bienvenido al bot oficial de @FreeTopTip.</b>\n\n"
-            "Aprovecha la promoción del VIP para lo que resta de semana por solo 9,99€. Pulsa el botón de abajo para hablar directamente conmigo.",
+            "Aprovecha el acceso <b>GRATUITO al PREMIUM</b> hasta las 16:45 CEST. Pulsa el botón de abajo para hablar directamente conmigo.",
             parse_mode="HTML",
             reply_markup=keyboard
         )
