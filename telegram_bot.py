@@ -16,7 +16,7 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # ---------------------------------------------------------
-# Publicaciones de Análisis por Partido (Japón)
+# Análisis de los 9 Partidos Únicos de la Imagen
 # ---------------------------------------------------------
 MATCH_POSTS = [
     {
@@ -197,7 +197,7 @@ MATCH_POSTS = [
 # ---------------------------------------------------------
 async def publish_all_picks(context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
-    logging.info("Iniciando envío de picks con el bot nuevo...")
+    logging.info("Iniciando envío de los 9 picks únicos...")
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔥 UNIRSE AL VIP POR 9,99€ (CLICK AQUÍ)", url="https://t.me/Mark122")]
