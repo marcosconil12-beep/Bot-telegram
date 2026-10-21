@@ -1,9 +1,22 @@
 import os
 import time
 import logging
+import threading
+from flask import Flask
 from zoneinfo import ZoneInfo
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+
+# Servidor Flask simulado para engañar a Render Web Service
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot activo", 200
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 # ---------------------------------------------------------
 # Configuración y Log
@@ -64,7 +77,6 @@ async def publish_all_picks(context: ContextTypes.DEFAULT_TYPE):
     ])
 
     try:
-        # Enviar resumen de resultados
         await bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
             text=JAPAN_RESULTS_POST["text"],
@@ -73,7 +85,6 @@ async def publish_all_picks(context: ContextTypes.DEFAULT_TYPE):
         logging.info("Publicado el resumen de resultados de Japón.")
         time.sleep(3)
 
-        # Enviar anuncio de Champions League y Promoción
         await bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
             text=CHAMPIONS_ANNOUNCEMENT_POST["text"],
@@ -104,6 +115,9 @@ async def start_command(update: object, context: ContextTypes.DEFAULT_TYPE):
 # Función Principal
 # ---------------------------------------------------------
 def main():
+    # Iniciar servidor web Flask en segundo plano
+    threading.Thread(target=run_flask, daemon=True).start()
+
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     if application.job_queue:
