@@ -10,13 +10,13 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # ---------------------------------------------------------
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8657360203:AAHt1LtezpuWJGr3lbpFBBKDi3iblEQmzFM")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8665484015:AAF1zLm4wuAItvQiqI2K-dmmyFn1hjzNUOk")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@FreeTopTip")
 
 SPAIN_TZ = ZoneInfo("Europe/Madrid")
 
 # ---------------------------------------------------------
-# Publicaciones de Análisis por Partido (Códigos Unicos)
+# Publicaciones de Análisis por Partido (Japón)
 # ---------------------------------------------------------
 MATCH_POSTS = [
     {
@@ -197,7 +197,7 @@ MATCH_POSTS = [
 # ---------------------------------------------------------
 async def publish_all_picks(context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
-    logging.info("Iniciando envío de picks para la jornada japonesa...")
+    logging.info("Iniciando envío de picks para la jornada japonesa con el bot nuevo...")
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔥 UNIRSE AL VIP POR 9,99€ (CLICK AQUÍ)", url="https://t.me/Mark122")]
